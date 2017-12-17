@@ -1,0 +1,16 @@
+{
+  "name": "dee-emci",
+  "version": "0.1.0",
+  "description": "Hey, nice to meet you! o(*>ω<*)o",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "author": "Frano Stanisic",
+  "license": "MIT",
+  "dependencies": {
+    "discord.js": "^11.1.0",
+    "express": "^4.15.3",
+    "node-cron": "^1.2.1"
+  }
+}
