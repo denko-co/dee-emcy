@@ -5,7 +5,7 @@ var tr = require('./translations.json');
 var Discord = require('discord.js');
 var bot = new Discord.Client({autoReconnect: true});
 
-bot.login(process.env.TOKEN); // REMOVE
+bot.login(process.env.TOKEN);
 
 var bestBuds = {};
 var qOfTheDay = '';
@@ -38,7 +38,6 @@ cron.schedule('0 11 * * *', function () {
 });
 
 bot.on('ready', function (event) {
-  channel.send('');
   console.log('Logged in as %s - %s\n', bot.user.username, bot.user.id);
 });
 
@@ -120,8 +119,8 @@ function postNewMessage (channel) {
   } else {
     qOfTheDay = questions.shift().question;
     channel.send('***Today\'s question is: ***' + qOfTheDay).then(function (message) {
-      message.react("%E2%AC%87");
-      message.react("%E2%AC%86");
+      message.react(UPVOTE_ID);
+      message.react(DOWNVOTE_ID);
       message.pin();
     });
   }
