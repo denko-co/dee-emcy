@@ -37,7 +37,7 @@ pers.init(function (err) {
     var message = messageReaction.message;
     var channelId = message.channel.id;
     pers.getChannelInfo(channelId, true, function (channelInfo) {
-      if (!(channelInfo === null)) {
+      if (channelInfo !== null) {
         if (message.author.id === bot.user.id && message.content === '***Today\'s question is: ***' + channelInfo.questionOfTheDay) {
           if (messageReaction.count === channelInfo.reactCount && messageReaction.emoji.identifier === channelInfo.downvoteId) {
             postNewMessage(message.channel);
@@ -48,7 +48,6 @@ pers.init(function (err) {
   });
 
   bot.on('message', function (message) {
-    // var channelID = message.channel.id.toString()
     if (!message.author.bot) {
       console.log(message.author.username + ' - ' + message.author.id + ' - ' + message.channel.id + ' - ' + message.content);
       if (message.channel instanceof Discord.DMChannel) {
