@@ -73,26 +73,20 @@ exports.getChannelInfo = function (channelId, isCheck, callback) {
 var addQuestion = function (channelId, question, author, callback) {
   var questions = db.getCollection('questions');
   var thisChannelInfo = db.getCollection('channelInfo').findOne({'channel': channelId});
-  console.log(channelId);
-  console.log(thisChannelInfo.nextQuestionToSaveId);
-  if (!questions.findOne({'channel': channelId, 'question': question})) {
-    questions.insert({
-      'channel': channelId,
-      'question': question,
-      'author': author,
-      'questionId': thisChannelInfo.nextQuestionToSaveId++
-    });
-    db.saveDatabase(function (err) {
-      if (err) {
-        callback(err);
-      } else {
-        console.log('Question saved successfully!');
-        callback(true);
-      }
-    });
-  } else {
-    callback(false);
-  }
+  questions.insert({
+    'channel': channelId,
+    'question': question,
+    'author': author,
+    'questionId': thisChannelInfo.nextQuestionToSaveId++
+  });
+  db.saveDatabase(function (err) {
+    if (err) {
+      callback(err);
+    } else {
+      console.log('Question saved successfully!');
+      callback();
+    }
+  });
 };
 
 exports.addQuestion = addQuestion;
@@ -104,18 +98,27 @@ exports.getNextQuestion = function (channelId, callback) {
   var question = questions.findOne({'channel': channelId, 'questionId': thisChannelInfo.nextQuestionToPostId});
   if (question) {
     thisChannelInfo.nextQuestionToPostId++;
-    thisChannelInfo.questionOfTheDay = question.question;
-    db.saveDatabase(function (err) {
-      if (err) {
-        callback(err);
-      } else {
-        console.log('Question, uh, nexted successfully!');
-        callback(question);
-      }
-    });
+    callback(question);
   } else {
     callback(null);
   }
+};
+
+exports.getQuestionMessageId = function (channelId) {
+  return db.getCollection('channelInfo').findOne({'channel': channelId}).questionOfTheDay;
+};
+
+exports.setQuestionMessageId = function (channelId, messageId, callback) {
+  var thisChannelInfo = db.getCollection('channelInfo').findOne({'channel': channelId});
+  thisChannelInfo.questionOfTheDay = messageId;
+  db.saveDatabase(function (err) {
+    if (err) {
+      callback(err);
+    } else {
+      console.log('Daily question saved!');
+      callback(messageId);
+    }
+  });
 };
 
 exports.getUserInfo = function (userId, callback) {
@@ -135,4 +138,19 @@ exports.getAllChannels = function () {
   return db.getCollection('channelInfo').find().map(function (document) {
     return document.channel;
   });
+};
+
+exports.hasDailyQuestion = function (channelId) {
+  return db.getCollection('channelInfo').findOne({'channel': channelId}).questionOfTheDay !== null;
+};
+
+// Will this work on old data? Let's find out.
+
+exports.getAsked = function (channelId) {
+  return db.getCollection('channelInfo').findOne({'channel': channelId}).asked;
+};
+
+exports.setAsked = function (channelId, value) {
+  db.getCollection('channelInfo').findOne({'channel': channelId}).asked = value;
+  db.saveDatabase();
 };

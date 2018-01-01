@@ -34,18 +34,40 @@ pers.init(function (err) {
   });
 
   bot.on('messageReactionAdd', function (messageReaction) {
+    handleReaction(messageReaction);
+  });
+
+  bot.on('messageReactionRemove', function (messageReaction) {
+    handleReaction(messageReaction);
+  });
+
+  function handleReaction (messageReaction) {
     var message = messageReaction.message;
     var channelId = message.channel.id;
     pers.getChannelInfo(channelId, true, function (channelInfo) {
       if (channelInfo !== null) {
-        if (message.author.id === bot.user.id && message.content === '***Today\'s question is: ***' + channelInfo.questionOfTheDay) {
-          if (messageReaction.count === channelInfo.reactCount && messageReaction.emoji.identifier === channelInfo.downvoteId) {
-            postNewMessage(message.channel);
+        if (message.author.id === bot.user.id && pers.getQuestionMessageId(channelId) === message.id) {
+          if (pers.getAsked(channelId)) {
+            if (messageReaction.emoji.identifier === channelInfo.upvoteId && messageReaction.count === channelInfo.reactCount + 1) {
+              postNewMessage(message.channel);
+            }
+          } else {
+            var diff = message.reactions.reduce(function (val, curr) {
+              if (curr.emoji.identifier === channelInfo.upvoteId) {
+                val -= curr.count;
+              } else if (curr.emoji.identifier === channelInfo.downvoteId) {
+                val += curr.count;
+              }
+              return val;
+            }, 0);
+            if (diff === channelInfo.reactCount) {
+              postNewMessage(message.channel);
+            }
           }
         }
       }
     });
-  });
+  }
 
   bot.on('message', function (message) {
     if (!message.author.bot) {
@@ -55,40 +77,49 @@ pers.init(function (err) {
           message.channel.startTyping();
           setTimeout(function () {
             pers.getUserInfo(message.author.id, function (userInfo, wasThere) {
-              if (wasThere) {
-                var questionRegx = /".*?"/g;
-                var toSave;
-                var found = 0;
-                while ((toSave = questionRegx.exec(message.content)) !== null) {
-                  found++;
-                  var channels = pers.getAllChannels();
-                  for (var channel in channels) {
-                    pers.addQuestion(channels[channel], toSave[0].slice(1, -1), message.author.id, function () {});
-                  }
-                  console.log(toSave[0]);
+              var questionRegx = /".*?"/g;
+              var toSave;
+              var found = 0;
+              while ((toSave = questionRegx.exec(message.content)) !== null) {
+                found++;
+                var channels = pers.getAllChannels();
+                for (var channel in channels) {
+                  pers.addQuestion(channels[channel], toSave[0].slice(1, -1), message.author.id, function () {});
                 }
-                if (found === 0) {
-                  if (!userInfo.knowsSecret) {
-                    message.channel.send(tr.sadbois).then(function () {
-                      message.channel.startTyping();
-                      setTimeout(function () {
-                        message.channel.send(tr.sadbois2);
-                        userInfo.knowsSecret = true;
-                        message.channel.stopTyping();
-                      }, 5000);
-                    });
-                  } else {
-                    message.channel.send('...  :3');
-                  }
+                console.log(toSave[0]);
+              }
+              if (found === 0) {
+                if (!wasThere) {
+                  message.channel.send(tr.greetingsUser);
+                } else if (!userInfo.knowsSecret) {
+                  message.channel.send(tr.sadbois).then(function () {
+                    message.channel.startTyping();
+                    setTimeout(function () {
+                      message.channel.send(tr.sadbois2);
+                      userInfo.knowsSecret = true;
+                      message.channel.stopTyping();
+                    }, 5000);
+                  });
                 } else {
-                  if (found > 1) {
-                    message.channel.send(tr.questRec2);
-                  } else {
-                    message.channel.send(tr.questRec);
-                  }
+                  message.channel.send('...  :3');
                 }
               } else {
-                message.channel.send(tr.greetingsUser);
+                if (found > 1) {
+                  message.channel.send(tr.questRec2);
+                } else {
+                  message.channel.send(tr.questRec);
+                }
+                for (var toCheck in channels) {
+                  if (!pers.hasDailyQuestion(channels[toCheck])) {
+                    bot.channels.get(channels[channel]).send(tr.aNewQ).then(function (message) {
+                      pers.getChannelInfo(channels[channel], true, function (channelInfo) {
+                        message.react(channelInfo.upvoteId);
+                        pers.setQuestionMessageId(message.channel.id, message.id, function () {});
+                        pers.setAsked(channels[channel], true);
+                      });
+                    });
+                  }
+                }
               }
             });
           }, 2000);
@@ -111,14 +142,25 @@ pers.init(function (err) {
           postNewMessage(bot.channels.get(channel.id));
         });
       }
+      if (channelInfo.questionOfTheDay !== null) {
+        channel.fetchMessage(channelInfo.questionOfTheDay).then(function (message) {
+          if (message.pinned) {
+            message.unpin();
+          }
+        });
+      }
       pers.getNextQuestion(channel.id, function (question) {
         if (question === null) {
-          channel.send(tr.allOut);
+          channel.send(tr.allOut).then(function (message) {
+            pers.setQuestionMessageId(message.channel.id, null, function () {});
+          });
         } else {
           channel.send('***Today\'s question is: ***' + question.question).then(function (message) {
             message.react(channelInfo.upvoteId);
             message.react(channelInfo.downvoteId);
             message.pin();
+            pers.setQuestionMessageId(message.channel.id, message.id, function () {});
+            pers.setAsked(message.channel.id, false);
           });
         }
       });
