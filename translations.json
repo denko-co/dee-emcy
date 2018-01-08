@@ -1,5 +1,5 @@
 {
-  "greetingsUser" : "Hey! Dee here. Got a question you want (me) to ask? Type it in quotes `\"like this\"`, and I'll ask it (eventually :P)! I look forward to hearing them! <3",
+  "greetingsUser" : "Hey! Dee here. Got a question you want (me) to ask? Type it in quotes `\"like this\"`, and I'll ask it (eventually :P)! I look forward to hearing them! If you're feeling a bit shy, type something like `answer \"Hey! I think you're really cool!\"`, and I'll post it on your behalf. <3",
   "sadbois" : "Hmmm... can I tell you a secret? Yeah? Okies... here goes...",
   "sadbois2" : "I'm not real! I have no idea what you said! D: Maybe someday though, yeah? ;)",
   "questRec" : "Ooh, that's a good one! Thanks! <3",
@@ -8,6 +8,9 @@
   "aSimpleQ1" : "Would you go back and redo everything, if you could?",
   "allOut" : "Oh noes! I'm out of questions! I'll go take a nap, send me a DM so we have something exciting to talk about tomorrow! <3",
   "whatHappened" : "Hey, Dee here! Someone gave me some notes, maybe you'd like to see them?\n\n",
-  "aNewQ" : "owo, what's this? A new question? If you wanna see it, let me know! Three :arrow_up: reacts, and I'll show! (Hey, that rhymed! :3)",
-  "dontPurge" : "Hey everyone! Dee here, nice to meet you! Every day, I'll post a question! Then, it's up to you!\nAt days end (or if a question gets three more :arrow_down: reacts than :arrow_up:), I'll post a new question and, uh, r9k the chat.\nIt's gonna be so much fun! :D If you want to add a question to the pool, just shoot me a DM!\nThanks for reading! <3"
+  "aNewQ" : "owo, what's this? A new question? If you wanna see it, let me know! Three :arrow_up: reacts, and I'll show! (Hey, that rhymed! :3) If you prefer suspense, you can also :arrow_down: and it'll cancel them out like usual.",
+  "secret" : "Okies! I'll pass that on! <3",
+  "aS" : "Anon says ~ ",
+  "noQTommorrow" : " - oh, and by the way, after this, I'm all out of questions! Hopefully someone can help me out? :3",
+  "dontPurge" : "Hey everyone! Dee here, nice to meet you! Every day, I'll post a question! Then, it's up to you!\nAt days end (or if a question gets three more :arrow_down: reacts than :arrow_up:), I'll post a new question! \nIt's gonna be so much fun! :D If you want to add a question to the pool, or wanna post all anon-like, just shoot me a DM!\nThanks for reading! <3"
 }

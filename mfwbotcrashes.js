@@ -91,13 +91,15 @@ var addQuestion = function (channelId, question, author, callback) {
 
 exports.addQuestion = addQuestion;
 
-exports.getNextQuestion = function (channelId, callback) {
-  console.log('Getting question for ' + channelId);
+exports.getNextQuestion = function (channelId, check, callback) {
+  console.log('Getting question for ' + channelId + ', with check as ' + check);
   var questions = db.getCollection('questions');
   var thisChannelInfo = db.getCollection('channelInfo').findOne({'channel': channelId});
   var question = questions.findOne({'channel': channelId, 'questionId': thisChannelInfo.nextQuestionToPostId});
   if (question) {
-    thisChannelInfo.nextQuestionToPostId++;
+    if (!check) {
+      thisChannelInfo.nextQuestionToPostId++;
+    }
     callback(question);
   } else {
     callback(null);
@@ -152,5 +154,14 @@ exports.getAsked = function (channelId) {
 
 exports.setAsked = function (channelId, value) {
   db.getCollection('channelInfo').findOne({'channel': channelId}).asked = value;
+  db.saveDatabase();
+};
+
+exports.getVersionText = function (channelId) {
+  return db.getCollection('channelInfo').findOne({'channel': channelId}).versionText;
+};
+
+exports.setVersionText = function (channelId, value) {
+  db.getCollection('channelInfo').findOne({'channel': channelId}).versionText = value;
   db.saveDatabase();
 };
