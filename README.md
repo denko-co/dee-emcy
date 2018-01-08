@@ -1,9 +1,16 @@
 # dee-emcy
 Hey, nice to meet you! o(*>ω&lt;*)o
 
+__**Version 1.4**__
+
+* Dee now has anon mode! DM `answer "<type answer here>"` to Dee, and she'll deliver it here!
+* Fixed version spam, and fixed that full stop in the 1.3 notes! >:(
+* Added prompt for when there will be no question tomorrow (don't let Dee get lonely pls ;~;)
+* Changed 'no questions' prompt to function like normal voting (but in reverse)
+
 __**Version 1.3**__
 
-* Improved handling of 'no questions' workflow - no naps for Dee ;~;.
+* Improved handling of 'no questions' workflow - no naps for Dee ;~;
 * Old questions are unpinned when a new question is posted.
 * Sending Dee a message in the save question format will skip intro dialog for new users.
 * Swatted no dupe questions / reaction question cycling bugs.

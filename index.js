@@ -26,9 +26,15 @@ pers.init(function (err) {
     fs.readFile('README.md', 'utf8', function (err, data) {
       if (err) throw err;
       var channels = pers.getAllChannels();
+      var releaseNoteRegx = /(__\*\*.*\*\*__[^_]*)__\*\*/g;
+      var releaseNote = releaseNoteRegx.exec(data)[1];
       for (var channel in channels) {
-        var releaseNoteRegx = /(__\*\*.*\*\*__[^_]*)__\*\*/g;
-        bot.channels.get(channels[channel]).send(tr.whatHappened + releaseNoteRegx.exec(data)[1]);
+        if (pers.getVersionText(channels[channel]) !== releaseNote) {
+          pers.setVersionText(channels[channel], releaseNote);
+          bot.channels.get(channels[channel]).send(tr.whatHappened + releaseNote);
+        } else {
+          console.log('Version matches, skipping!');
+        }
       }
     });
   });
@@ -47,26 +53,31 @@ pers.init(function (err) {
     pers.getChannelInfo(channelId, true, function (channelInfo) {
       if (channelInfo !== null) {
         if (message.author.id === bot.user.id && pers.getQuestionMessageId(channelId) === message.id) {
-          if (pers.getAsked(channelId)) {
-            if (messageReaction.emoji.identifier === channelInfo.upvoteId && messageReaction.count === channelInfo.reactCount + 1) {
-              postNewMessage(message.channel);
+          var diff = message.reactions.reduce(function (val, curr) {
+            if (curr.emoji.identifier === channelInfo.upvoteId) {
+              val -= curr.count;
+            } else if (curr.emoji.identifier === channelInfo.downvoteId) {
+              val += curr.count;
             }
-          } else {
-            var diff = message.reactions.reduce(function (val, curr) {
-              if (curr.emoji.identifier === channelInfo.upvoteId) {
-                val -= curr.count;
-              } else if (curr.emoji.identifier === channelInfo.downvoteId) {
-                val += curr.count;
-              }
-              return val;
-            }, 0);
-            if (diff === channelInfo.reactCount) {
-              postNewMessage(message.channel);
-            }
+            return val;
+          }, 0);
+          // Flip votes if asking to cycle
+          diff = pers.getAsked(channelId) ? diff * -1 : diff;
+          if (diff === channelInfo.reactCount) {
+            postNewMessage(message.channel);
           }
         }
       }
     });
+  }
+
+  function recursiveSave (arrayOfQs, name) {
+    if (arrayOfQs.length > 0) {
+      pers.addQuestion(arrayOfQs[0][0], arrayOfQs[0][1], name, function () {
+        arrayOfQs.shift();
+        recursiveSave(arrayOfQs);
+      });
+    }
   }
 
   bot.on('message', function (message) {
@@ -79,45 +90,57 @@ pers.init(function (err) {
             pers.getUserInfo(message.author.id, function (userInfo, wasThere) {
               var questionRegx = /".*?"/g;
               var toSave;
-              var found = 0;
-              while ((toSave = questionRegx.exec(message.content)) !== null) {
-                found++;
-                var channels = pers.getAllChannels();
-                for (var channel in channels) {
-                  pers.addQuestion(channels[channel], toSave[0].slice(1, -1), message.author.id, function () {});
+              var channels = pers.getAllChannels();
+              if (message.content.startsWith('answer "') && message.content.endsWith('"')) {
+                // Send through to all listening channels as anon. Should take a channel param in future,
+                // once we decide how that will work generally for all denko-co apps.
+                for (var toSendAnon in channels) {
+                  bot.channels.get(channels[toSendAnon]).send(tr.aS + message.content.slice(8, -1));
                 }
-                console.log(toSave[0]);
-              }
-              if (found === 0) {
-                if (!wasThere) {
-                  message.channel.send(tr.greetingsUser);
-                } else if (!userInfo.knowsSecret) {
-                  message.channel.send(tr.sadbois).then(function () {
-                    message.channel.startTyping();
-                    setTimeout(function () {
-                      message.channel.send(tr.sadbois2);
-                      userInfo.knowsSecret = true;
-                      message.channel.stopTyping();
-                    }, 5000);
-                  });
-                } else {
-                  message.channel.send('...  :3');
-                }
+                message.channel.send(tr.secret);
               } else {
-                if (found > 1) {
-                  message.channel.send(tr.questRec2);
-                } else {
-                  message.channel.send(tr.questRec);
+                var questionsToSave = [];
+                while ((toSave = questionRegx.exec(message.content)) !== null) {
+                  for (var channel in channels) {
+                    questionsToSave.push([channels[channel], toSave[0].slice(1, -1)]);
+                  }
+                  console.log(toSave[0]);
                 }
-                for (var toCheck in channels) {
-                  if (!pers.hasDailyQuestion(channels[toCheck])) {
-                    bot.channels.get(channels[channel]).send(tr.aNewQ).then(function (message) {
-                      pers.getChannelInfo(channels[channel], true, function (channelInfo) {
-                        message.react(channelInfo.upvoteId);
-                        pers.setQuestionMessageId(message.channel.id, message.id, function () {});
-                        pers.setAsked(channels[channel], true);
-                      });
+                var found = questionsToSave.length;
+                recursiveSave(questionsToSave, message.author.id); // lmao @ promises
+                if (found === 0) {
+                  if (!wasThere) {
+                    message.channel.send(tr.greetingsUser);
+                  } else if (!userInfo.knowsSecret) {
+                    message.channel.send(tr.sadbois).then(function () {
+                      message.channel.startTyping();
+                      setTimeout(function () {
+                        message.channel.send(tr.sadbois2);
+                        userInfo.knowsSecret = true;
+                        message.channel.stopTyping();
+                      }, 5000);
                     });
+                  } else {
+                    message.channel.send('...  :3');
+                  }
+                } else {
+                  if (found > 1) {
+                    message.channel.send(tr.questRec2);
+                  } else {
+                    message.channel.send(tr.questRec);
+                  }
+                  for (var toCheck in channels) {
+                    if (!pers.hasDailyQuestion(channels[toCheck])) {
+                      bot.channels.get(channels[channel]).send(tr.aNewQ).then(function (message) {
+                        pers.getChannelInfo(channels[channel], true, function (channelInfo) {
+                          message.react(channelInfo.upvoteId).then(function (reactionAdded) {
+                            message.react(channelInfo.downvoteId);
+                          });
+                          pers.setQuestionMessageId(message.channel.id, message.id, function () {});
+                          pers.setAsked(channels[channel], true);
+                        });
+                      });
+                    }
                   }
                 }
               }
@@ -149,18 +172,22 @@ pers.init(function (err) {
           }
         });
       }
-      pers.getNextQuestion(channel.id, function (question) {
+      pers.getNextQuestion(channel.id, false, function (question) {
         if (question === null) {
           channel.send(tr.allOut).then(function (message) {
             pers.setQuestionMessageId(message.channel.id, null, function () {});
           });
         } else {
-          channel.send('***Today\'s question is: ***' + question.question).then(function (message) {
-            message.react(channelInfo.upvoteId);
-            message.react(channelInfo.downvoteId);
-            message.pin();
-            pers.setQuestionMessageId(message.channel.id, message.id, function () {});
-            pers.setAsked(message.channel.id, false);
+          pers.getNextQuestion(channel.id, true, function (nextQ) {
+            var needQ = (nextQ === null) ? tr.noQTommorrow : '';
+            channel.send('***Today\'s question is: ***' + question.question + needQ).then(function (message) {
+              message.react(channelInfo.upvoteId).then(function (reactionAdded) {
+                message.react(channelInfo.downvoteId);
+              });
+              message.pin();
+              pers.setQuestionMessageId(message.channel.id, message.id, function () {});
+              pers.setAsked(message.channel.id, false);
+            });
           });
         }
       });
