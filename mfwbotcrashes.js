@@ -12,8 +12,8 @@ var init = function (callback) {
     if (err) {
       callback(err);
     } else {
-      var collections = ['questions', 'channelInfo', 'userInfo'];
-      for (var collection in ['questions', 'channelInfo', 'userInfo']) {
+      var collections = ['questions', 'shallow-questions', 'channelInfo', 'userInfo'];
+      for (var collection in collections) {
         createCollection(db, collections[collection]);
       }
       db.saveDatabase(function (err) {
@@ -70,8 +70,8 @@ exports.getChannelInfo = function (channelId, isCheck, callback) {
   }
 };
 
-var addQuestion = function (channelId, question, author, callback) {
-  var questions = db.getCollection('questions');
+var addQuestion = function (channelId, question, author, callback, shallow) {
+  var questions = shallow ? db.getCollection('shallow-questions') : db.getCollection('questions');
   var thisChannelInfo = db.getCollection('channelInfo').findOne({'channel': channelId});
   questions.insert({
     'channel': channelId,
@@ -91,9 +91,9 @@ var addQuestion = function (channelId, question, author, callback) {
 
 exports.addQuestion = addQuestion;
 
-exports.getNextQuestion = function (channelId, check, callback) {
+exports.getNextQuestion = function (channelId, check, callback, shallow) {
   console.log('Getting question for ' + channelId + ', with check as ' + check);
-  var questions = db.getCollection('questions');
+  var questions = shallow ? db.getCollection('shallow-questions') : db.getCollection('questions');
   var thisChannelInfo = db.getCollection('channelInfo').findOne({'channel': channelId});
   var question = questions.findOne({'channel': channelId, 'questionId': thisChannelInfo.nextQuestionToPostId});
   if (question) {
