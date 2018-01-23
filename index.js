@@ -203,7 +203,7 @@ pers.init(function (err) {
               pers.setQuestionMessageId(message.channel.id, message.id, function () {});
               pers.setAsked(message.channel.id, false);
             });
-          });
+          }, false);
         }
       }, shouldFlip);
     });
