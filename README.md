@@ -2,6 +2,7 @@
 Hey, nice to meet you! o(*>ω&lt;*)o
 
 __**Version 1.5**__
+
 * Added shallow and pointless (SPD) discussion category, to be posted in the morning! Is it time for a name change? owo
 * Send Dee your shallow pointless prompts by typing `spd` and then the rest as usual. Thanks Scur! <3
 
