@@ -38,6 +38,15 @@ function createCollection (db, name) {
 
 exports.init = init;
 
+exports.performDataUpgrade = function (channelId) {
+  var thisChannelInfo = db.getCollection('channelInfo').findOne({'channel': channelId});
+  thisChannelInfo.nextShallowQuestionToPostId = 1;
+  thisChannelInfo.nextShallowQuestionToSaveId = 1;
+  thisChannelInfo.isQuestionShallow = false;
+  console.log('Upgrade performed for channel ' + channelId);
+  db.saveDatabase();
+};
+
 exports.getChannelInfo = function (channelId, isCheck, callback) {
   var channelInfo = db.getCollection('channelInfo');
   var thisChannelInfo = channelInfo.findOne({'channel': channelId});
@@ -52,7 +61,10 @@ exports.getChannelInfo = function (channelId, isCheck, callback) {
         'upvoteId': '%E2%AC%86',
         'questionOfTheDay': '', // I sure hope this works
         'nextQuestionToPostId': 1,
-        'nextQuestionToSaveId': 1
+        'nextQuestionToSaveId': 1,
+        'nextShallowQuestionToPostId': 1,
+        'nextShallowQuestionToSaveId': 1,
+        'isQuestionShallow': false
       });
       addQuestion(channelId, tr.aSimpleQ1, '<3', function () {
         db.saveDatabase(function (err) {
@@ -77,7 +89,7 @@ var addQuestion = function (channelId, question, author, callback, shallow) {
     'channel': channelId,
     'question': question,
     'author': author,
-    'questionId': thisChannelInfo.nextQuestionToSaveId++
+    'questionId': shallow ? thisChannelInfo.nextShallowQuestionToSaveId++ : thisChannelInfo.nextQuestionToSaveId++
   });
   db.saveDatabase(function (err) {
     if (err) {
@@ -91,16 +103,20 @@ var addQuestion = function (channelId, question, author, callback, shallow) {
 
 exports.addQuestion = addQuestion;
 
-exports.getNextQuestion = function (channelId, check, callback, shallow) {
-  console.log('Getting question for ' + channelId + ', with check as ' + check);
-  var questions = shallow ? db.getCollection('shallow-questions') : db.getCollection('questions');
+exports.getNextQuestion = function (channelId, check, callback, shouldFlip) {
+  console.log('Getting question for ' + channelId + ', with check as ' + check + ' and shouldFlip as ' + shouldFlip);
   var thisChannelInfo = db.getCollection('channelInfo').findOne({'channel': channelId});
-  var question = questions.findOne({'channel': channelId, 'questionId': thisChannelInfo.nextQuestionToPostId});
+  var shallow = shouldFlip ? !thisChannelInfo.isQuestionShallow : thisChannelInfo.isQuestionShallow;
+  var questions = shallow ? db.getCollection('shallow-questions') : db.getCollection('questions');
+  var question = questions.findOne({'channel': channelId, 'questionId': shallow ? thisChannelInfo.nextShallowQuestionToPostId : thisChannelInfo.nextQuestionToPostId});
+  if (!check && shouldFlip) { // Shouldn't really check and flip
+    flipShallow(channelId);
+  }
   if (question) {
     if (!check) {
-      thisChannelInfo.nextQuestionToPostId++;
+      shallow ? thisChannelInfo.nextShallowQuestionToPostId++ : thisChannelInfo.nextQuestionToPostId++;
     }
-    callback(question);
+    callback(question, shallow);
   } else {
     callback(null);
   }
@@ -146,8 +162,6 @@ exports.hasDailyQuestion = function (channelId) {
   return db.getCollection('channelInfo').findOne({'channel': channelId}).questionOfTheDay !== null;
 };
 
-// Will this work on old data? Let's find out.
-
 exports.getAsked = function (channelId) {
   return db.getCollection('channelInfo').findOne({'channel': channelId}).asked;
 };
@@ -165,3 +179,15 @@ exports.setVersionText = function (channelId, value) {
   db.getCollection('channelInfo').findOne({'channel': channelId}).versionText = value;
   db.saveDatabase();
 };
+
+exports.getIsShallow = function (channelId) {
+  return db.getCollection('channelInfo').findOne({'channel': channelId}).isQuestionShallow;
+};
+
+var flipShallow = function (channelId) {
+  var thisChannelInfo = db.getCollection('channelInfo').findOne({'channel': channelId});
+  thisChannelInfo.isQuestionShallow = !thisChannelInfo.isQuestionShallow;
+  db.saveDatabase();
+};
+
+exports.flipShallow = flipShallow;

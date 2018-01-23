@@ -2,8 +2,8 @@
 Hey, nice to meet you! o(*>ω&lt;*)o
 
 __**Version 1.5**__
-* Added shallow pointless discussion category to be posted in the morning
-* You can send Dee your shallow pointless prompts by DMing `spd "<prompt>"`, you will see the fruits of your labour in a few mornings time!
+* Added shallow and pointless (SPD) discussion category, to be posted in the morning! Is it time for a name change? owo
+* Send Dee your shallow pointless prompts by typing `spd` and then the rest as usual. Thanks Scur! <3
 
 __**Version 1.4**__
 
