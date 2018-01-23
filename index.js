@@ -187,13 +187,13 @@ pers.init(function (err) {
           }
         });
       }
-      pers.getNextQuestion(channel.id, false, function (question) {
+      pers.getNextQuestion(channel.id, false, function (question, shallow) {
         if (question === null) {
           channel.send(tr.allOut).then(function (message) {
             pers.setQuestionMessageId(message.channel.id, null, function () {});
           });
         } else {
-          pers.getNextQuestion(channel.id, true, function (nextQ, shallow) {
+          pers.getNextQuestion(channel.id, true, function (nextQ) {
             var needQ = (nextQ === null) ? tr.noQTommorrow : '';
             channel.send(`***Today's ${shallow ? 'shallow and pointless' : 'deep and meaningful'} question is: ***` + question.question + needQ).then(function (message) {
               message.react(channelInfo.upvoteId).then(function (reactionAdded) {
