@@ -16,8 +16,8 @@ pers.init(function (err) {
   }
   var channelsCron = pers.getAllChannels();
   for (var channel in channelsCron) {
-    cron.schedule('0 2 * * *', function () {
-      postNewMessage(bot.channels.get(channelsCron[channel]));
+    cron.schedule('0 2,21 * * *', function () {
+      postNewMessage(bot.channels.get(channelsCron[channel]), true);
     });
   }
 
@@ -31,6 +31,7 @@ pers.init(function (err) {
       for (var channel in channels) {
         if (pers.getVersionText(channels[channel]) !== releaseNote) {
           pers.setVersionText(channels[channel], releaseNote);
+          pers.performDataUpgrade(channels[channel]);
           bot.channels.get(channels[channel]).send(tr.whatHappened + releaseNote);
         } else {
           console.log('Version matches, skipping!');
@@ -71,12 +72,12 @@ pers.init(function (err) {
     });
   }
 
-  function recursiveSave (arrayOfQs, name) {
+  function recursiveSave (arrayOfQs, name, shallow) {
     if (arrayOfQs.length > 0) {
       pers.addQuestion(arrayOfQs[0][0], arrayOfQs[0][1], name, function () {
         arrayOfQs.shift();
-        recursiveSave(arrayOfQs);
-      });
+        recursiveSave(arrayOfQs, name, shallow);
+      }, shallow);
     }
   }
 
@@ -88,17 +89,10 @@ pers.init(function (err) {
           message.channel.startTyping();
           setTimeout(function () {
             pers.getUserInfo(message.author.id, function (userInfo, wasThere) {
-              var questionRegx = /".*?"/g;
-              var toSave;
               var channels = pers.getAllChannels();
-              if (message.content.startsWith('answer "') && message.content.endsWith('"')) {
-                // Send through to all listening channels as anon. Should take a channel param in future,
-                // once we decide how that will work generally for all denko-co apps.
-                for (var toSendAnon in channels) {
-                  bot.channels.get(channels[toSendAnon]).send(tr.aS + message.content.slice(8, -1));
-                }
-                message.channel.send(tr.secret);
-              } else {
+              var saveQ = function (shallow) {
+                var questionRegx = /".*?"/g;
+                var toSave;
                 var questionsToSave = [];
                 while ((toSave = questionRegx.exec(message.content)) !== null) {
                   for (var channel in channels) {
@@ -107,7 +101,7 @@ pers.init(function (err) {
                   console.log(toSave[0]);
                 }
                 var found = questionsToSave.length;
-                recursiveSave(questionsToSave, message.author.id); // lmao @ promises
+                recursiveSave(questionsToSave, message.author.id, shallow); // lmao @ promises
                 if (found === 0) {
                   if (!wasThere) {
                     message.channel.send(tr.greetingsUser);
@@ -130,7 +124,7 @@ pers.init(function (err) {
                     message.channel.send(tr.questRec);
                   }
                   for (var toCheck in channels) {
-                    if (!pers.hasDailyQuestion(channels[toCheck])) {
+                    if (!pers.hasDailyQuestion(channels[toCheck]) && pers.getIsShallow(channels[toCheck]) === shallow) {
                       bot.channels.get(channels[channel]).send(tr.aNewQ).then(function (message) {
                         pers.getChannelInfo(channels[channel], true, function (channelInfo) {
                           message.react(channelInfo.upvoteId).then(function (reactionAdded) {
@@ -143,6 +137,19 @@ pers.init(function (err) {
                     }
                   }
                 }
+              };
+
+              if (message.content.startsWith('answer "') && message.content.endsWith('"')) {
+                // Send through to all listening channels as anon. Should take a channel param in future,
+                // once we decide how that will work generally for all denko-co apps.
+                for (var toSendAnon in channels) {
+                  bot.channels.get(channels[toSendAnon]).send(tr.aS + message.content.slice(8, -1));
+                }
+                message.channel.send(tr.secret);
+              } else if (message.content.startsWith('spd ')) {
+                saveQ(true);
+              } else {
+                saveQ(false);
               }
             });
           }, 2000);
@@ -155,14 +162,22 @@ pers.init(function (err) {
           postNewMessage(message.channel);
         });
       }
+      if (message.content === tr.flip) {
+        pers.getChannelInfo(message.channel.id, true, function (channelInfo) {
+          if (channelInfo !== null) {
+            pers.flipShallow(message.channel.id);
+            message.channel.send(tr.barrel);
+          }
+        });
+      }
     }
   });
 
-  function postNewMessage (channel) {
+  function postNewMessage (channel, shouldFlip) {
     pers.getChannelInfo(channel.id, false, function (channelInfo, isNewChannel) {
       if (isNewChannel) {
-        cron.schedule('0 2 * * *', function () {
-          postNewMessage(bot.channels.get(channel.id));
+        cron.schedule('0 2,21 * * *', function () {
+          postNewMessage(bot.channels.get(channel.id), true);
         });
       }
       if (channelInfo.questionOfTheDay !== null) {
@@ -178,9 +193,9 @@ pers.init(function (err) {
             pers.setQuestionMessageId(message.channel.id, null, function () {});
           });
         } else {
-          pers.getNextQuestion(channel.id, true, function (nextQ) {
+          pers.getNextQuestion(channel.id, true, function (nextQ, shallow) {
             var needQ = (nextQ === null) ? tr.noQTommorrow : '';
-            channel.send('***Today\'s question is: ***' + question.question + needQ).then(function (message) {
+            channel.send(`***Today's ${shallow ? 'shallow and pointless' : 'deep and meaningful'} question is: ***` + question.question + needQ).then(function (message) {
               message.react(channelInfo.upvoteId).then(function (reactionAdded) {
                 message.react(channelInfo.downvoteId);
               });
@@ -190,7 +205,7 @@ pers.init(function (err) {
             });
           });
         }
-      });
+      }, shouldFlip);
     });
   }
 
