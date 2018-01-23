@@ -65,7 +65,7 @@ pers.init(function (err) {
           // Flip votes if asking to cycle
           diff = pers.getAsked(channelId) ? diff * -1 : diff;
           if (diff === channelInfo.reactCount) {
-            postNewMessage(message.channel);
+            postNewMessage(message.channel, false);
           }
         }
       }
@@ -159,7 +159,7 @@ pers.init(function (err) {
       }
       if (message.content === tr.introduceYourself) {
         message.channel.send(tr.dontPurge).then(function () {
-          postNewMessage(message.channel);
+          postNewMessage(message.channel, false);
         });
       }
       if (message.content === tr.flip) {
