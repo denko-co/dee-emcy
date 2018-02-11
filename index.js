@@ -16,7 +16,7 @@ pers.init(function (err) {
   }
   var channelsCron = pers.getAllChannels();
   for (var channel in channelsCron) {
-    cron.schedule('0 2,21 * * *', function () {
+    cron.schedule('0 1,20 * * *', function () {
       postNewMessage(bot.channels.get(channelsCron[channel]), true);
     });
   }
@@ -176,7 +176,7 @@ pers.init(function (err) {
   function postNewMessage (channel, shouldFlip) {
     pers.getChannelInfo(channel.id, false, function (channelInfo, isNewChannel) {
       if (isNewChannel) {
-        cron.schedule('0 2,21 * * *', function () {
+        cron.schedule('0 1,20 * * *', function () {
           postNewMessage(bot.channels.get(channel.id), true);
         });
       }
