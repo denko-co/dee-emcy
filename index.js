@@ -81,7 +81,7 @@ pers.init(function (err) {
     }
   }
 
-  function newMessagedReceived (message) {
+  function handleDirectMessage (message) {
     pers.getUserInfo(message.author.id, function (userInfo, wasThere) {
       var channels = pers.getAllChannels();
       var saveQ = function (shallow) {
@@ -154,7 +154,7 @@ pers.init(function (err) {
       console.log(message.author.username + ' - ' + message.author.id + ' - ' + message.channel.id + ' - ' + message.content);
       if (message.channel instanceof Discord.DMChannel) {
         message.channel.startTyping();
-        setTimeout(newMessagedReceived, 2000, message);
+        setTimeout(handleDirectMessage, 2000, message);
         return;
       }
       if (message.content === tr.introduceYourself) {
