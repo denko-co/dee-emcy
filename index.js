@@ -81,80 +81,80 @@ pers.init(function (err) {
     }
   }
 
+  function handleDirectMessage (message) {
+    pers.getUserInfo(message.author.id, function (userInfo, wasThere) {
+      var channels = pers.getAllChannels();
+      var saveQ = function (shallow) {
+        var questionRegx = /".*?"/g;
+        var toSave;
+        var questionsToSave = [];
+        while ((toSave = questionRegx.exec(message.content)) !== null) {
+          for (var channel in channels) {
+            questionsToSave.push([channels[channel], toSave[0].slice(1, -1)]);
+          }
+          console.log(toSave[0]);
+        }
+        var found = questionsToSave.length;
+        recursiveSave(questionsToSave, message.author.id, shallow); // lmao @ promises
+        if (found === 0) {
+          if (!wasThere) {
+            message.channel.send(tr.greetingsUser);
+          } else if (!userInfo.knowsSecret) {
+            message.channel.send(tr.sadbois).then(function () {
+              message.channel.startTyping();
+              setTimeout(function () {
+                message.channel.send(tr.sadbois2);
+                userInfo.knowsSecret = true;
+                message.channel.stopTyping();
+              }, 5000);
+            });
+          } else {
+            message.channel.send('...  :3');
+          }
+        } else {
+          if (found > 1) {
+            message.channel.send(tr.questRec2);
+          } else {
+            message.channel.send(tr.questRec);
+          }
+          for (var toCheck in channels) {
+            if (!pers.hasDailyQuestion(channels[toCheck]) && pers.getIsShallow(channels[toCheck]) === shallow) {
+              bot.channels.get(channels[channel]).send(tr.aNewQ).then(function (message) {
+                pers.getChannelInfo(channels[channel], true, function (channelInfo) {
+                  message.react(channelInfo.upvoteId).then(function (reactionAdded) {
+                    message.react(channelInfo.downvoteId);
+                  });
+                  pers.setQuestionMessageId(message.channel.id, message.id, function () {});
+                  pers.setAsked(channels[channel], true);
+                });
+              });
+            }
+          }
+        }
+      };
+
+      if (message.content.startsWith('answer "') && message.content.endsWith('"')) {
+        // Send through to all listening channels as anon. Should take a channel param in future,
+        // once we decide how that will work generally for all denko-co apps.
+        for (var toSendAnon in channels) {
+          bot.channels.get(channels[toSendAnon]).send(tr.aS + message.content.slice(8, -1));
+        }
+        message.channel.send(tr.secret);
+      } else if (message.content.startsWith('spd ')) {
+        saveQ(true);
+      } else {
+        saveQ(false);
+      }
+      message.channel.stopTyping();
+    });
+  }
+
   bot.on('message', function (message) {
     if (!message.author.bot) {
       console.log(message.author.username + ' - ' + message.author.id + ' - ' + message.channel.id + ' - ' + message.content);
       if (message.channel instanceof Discord.DMChannel) {
-        setTimeout(function () { // I am never using setTimeout again in my life
-          message.channel.startTyping();
-          setTimeout(function () {
-            pers.getUserInfo(message.author.id, function (userInfo, wasThere) {
-              var channels = pers.getAllChannels();
-              var saveQ = function (shallow) {
-                var questionRegx = /".*?"/g;
-                var toSave;
-                var questionsToSave = [];
-                while ((toSave = questionRegx.exec(message.content)) !== null) {
-                  for (var channel in channels) {
-                    questionsToSave.push([channels[channel], toSave[0].slice(1, -1)]);
-                  }
-                  console.log(toSave[0]);
-                }
-                var found = questionsToSave.length;
-                recursiveSave(questionsToSave, message.author.id, shallow); // lmao @ promises
-                if (found === 0) {
-                  if (!wasThere) {
-                    message.channel.send(tr.greetingsUser);
-                  } else if (!userInfo.knowsSecret) {
-                    message.channel.send(tr.sadbois).then(function () {
-                      message.channel.startTyping();
-                      setTimeout(function () {
-                        message.channel.send(tr.sadbois2);
-                        userInfo.knowsSecret = true;
-                        message.channel.stopTyping();
-                      }, 5000);
-                    });
-                  } else {
-                    message.channel.send('...  :3');
-                  }
-                } else {
-                  if (found > 1) {
-                    message.channel.send(tr.questRec2);
-                  } else {
-                    message.channel.send(tr.questRec);
-                  }
-                  for (var toCheck in channels) {
-                    if (!pers.hasDailyQuestion(channels[toCheck]) && pers.getIsShallow(channels[toCheck]) === shallow) {
-                      bot.channels.get(channels[channel]).send(tr.aNewQ).then(function (message) {
-                        pers.getChannelInfo(channels[channel], true, function (channelInfo) {
-                          message.react(channelInfo.upvoteId).then(function (reactionAdded) {
-                            message.react(channelInfo.downvoteId);
-                          });
-                          pers.setQuestionMessageId(message.channel.id, message.id, function () {});
-                          pers.setAsked(channels[channel], true);
-                        });
-                      });
-                    }
-                  }
-                }
-              };
-
-              if (message.content.startsWith('answer "') && message.content.endsWith('"')) {
-                // Send through to all listening channels as anon. Should take a channel param in future,
-                // once we decide how that will work generally for all denko-co apps.
-                for (var toSendAnon in channels) {
-                  bot.channels.get(channels[toSendAnon]).send(tr.aS + message.content.slice(8, -1));
-                }
-                message.channel.send(tr.secret);
-              } else if (message.content.startsWith('spd ')) {
-                saveQ(true);
-              } else {
-                saveQ(false);
-              }
-            });
-          }, 2000);
-          message.channel.stopTyping();
-        }, 500);
+        message.channel.startTyping();
+        setTimeout(handleDirectMessage, 2000, message);
         return;
       }
       if (message.content === tr.introduceYourself) {
