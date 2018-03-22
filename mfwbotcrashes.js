@@ -56,7 +56,7 @@ exports.getChannelInfo = function (channelId, isCheck, callback) {
     } else {
       var newChannel = channelInfo.insert({
         'channel': channelId,
-        'reactCount': 2,
+        'reactCount': 3,
         'downvoteId': '%E2%AC%87',
         'upvoteId': '%E2%AC%86',
         'questionOfTheDay': '', // I sure hope this works
