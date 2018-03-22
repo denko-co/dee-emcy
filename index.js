@@ -72,51 +72,124 @@ pers.init(function (err) {
     });
   }
 
-  function recursiveSave (arrayOfQs, name, shallow) {
-    if (arrayOfQs.length > 0) {
-      pers.addQuestion(arrayOfQs[0][0], arrayOfQs[0][1], name, function () {
-        arrayOfQs.shift();
-        recursiveSave(arrayOfQs, name, shallow);
-      }, shallow);
-    }
-  }
-
   function handleDirectMessage (message) {
+    var msgContent = message.content;
+
+    var paramCommands = {
+      answer: ['a', 'ans', 'answer', 'anon'],
+      dmc: ['d', 'dmc'],
+      spd: ['s', 'spd']
+    };
+
+    var paramCommandsDetails = {
+      answer: {
+        description: 'If you\'re feeling a bit shy, if you send it to me, I can post it on your behalf.',
+        usage: 'answer "Hey! I think you\'re really cool!"'
+      },
+      dmc: {
+        description: 'If you\'ve got something deep and meaningful you\'d like to ask, send it to me like this, and I\'ll post it! (eventually! :P)',
+        usage: 'dmc "Would you go back and redo everything, if you could?"'
+      },
+      spd: {
+        description: 'If you\'ve got something a bit more lighthearted to discuss, that\'s okies too! ^^ I will post that one morning as well.',
+        usage: 'spd "How many holes does a straw have, one or two?"'
+      }
+    };
+
+    var nonParamCommands = {
+      help: ['h', 'help']
+    };
+
+    var nonParamCommandsDetails = {
+      help: {
+        description: 'If you ever feel a bit stuck, or forget something (don\'t worry, happens to me too... more than I\'d like... >.>\'), send this to get this message again.',
+        usage: '--help'
+      }
+    };
+
+    function generateHelpText () {
+      var helpText = '';
+      helpText += tr.helpText1;
+      helpText += '\n-----\n' + tr.helpText2;
+
+      for (var ncommandId in nonParamCommands) {
+        var ncommand = nonParamCommands[ncommandId];
+        var ncommandDetails = nonParamCommandsDetails[ncommandId];
+        helpText += '\n**' + ncommand.join(', ') + '** - ' + ncommandDetails.description + ' *For example:* `' + ncommandDetails.usage + '`\n';
+      }
+
+      helpText += '\n-----\n' + tr.helpText3;
+
+      for (var commandId in paramCommands) {
+        var command = paramCommands[commandId];
+        var commandDetails = paramCommandsDetails[commandId];
+        helpText += '\n**' + command.join(', ') + '** - ' + commandDetails.description + ' *For example:* `' + commandDetails.usage + '`\n';
+      }
+
+      helpText += '\n-----\n' + tr.helpText4;
+
+      return helpText;
+    }
+
+    for (var i = 0; i < msgContent.length; i++) {
+      if (msgContent.charAt(i) !== '-') {
+        msgContent = msgContent.substring(i);
+        break;
+      }
+    }
+
+    // Whatever we have here will either have the leading dashes removed OR
+    // be entirely -----, in which case it will get picked up later as invalid
+    // I'd rather not have to pull that handling logic out for this one specific case
+
+    // First, split it on the first whitespace, to see what bucket we need to check
+
+    var paramReg = /^(\S*)\s*(.*)$/; // NON GLOBAL REGEX WEOW
+    var params = paramReg.exec(msgContent);
+    var validOld = false;
+    var modifierParam = params[1].toLowerCase();
+    var mainParam = params[2];
+
+    // Ready to rumble! Grab the current user, start parsing input.
+
     pers.getUserInfo(message.author.id, function (userInfo, wasThere) {
       var channels = pers.getAllChannels();
-      var saveQ = function (shallow) {
-        var questionRegx = /".*?"/g;
-        var toSave;
-        var questionsToSave = [];
-        while ((toSave = questionRegx.exec(message.content)) !== null) {
-          for (var channel in channels) {
-            questionsToSave.push([channels[channel], toSave[0].slice(1, -1)]);
-          }
-          console.log(toSave[0]);
+
+      // Check if second param is empty, if so, run non-param checkLoops
+      if (mainParam === '') {
+        if (nonParamCommands.help.includes(modifierParam)) {
+          // Handle help
+          message.channel.send(generateHelpText());
+          message.channel.stopTyping();
+          return;
         }
-        var found = questionsToSave.length;
-        recursiveSave(questionsToSave, message.author.id, shallow); // lmao @ promises
-        if (found === 0) {
-          if (!wasThere) {
-            message.channel.send(tr.greetingsUser);
-          } else if (!userInfo.knowsSecret) {
-            message.channel.send(tr.sadbois).then(function () {
-              message.channel.startTyping();
-              setTimeout(function () {
-                message.channel.send(tr.sadbois2);
-                userInfo.knowsSecret = true;
-                message.channel.stopTyping();
-              }, 5000);
-            });
-          } else {
-            message.channel.send('...  :3');
+      } else if (mainParam.length > 2 && mainParam[0] === '"' && mainParam[mainParam.length - 1] === '"') {
+        if (paramCommands.answer.includes(modifierParam)) {
+          // Handle answer
+
+          // Send through to all listening channels as anon. Should take a channel param in future,
+          // once we decide how that will work generally for all denko-co apps.
+
+          for (var toSendAnon in channels) {
+            bot.channels.get(channels[toSendAnon]).send(tr.aS + mainParam.slice(1, -1));
           }
-        } else {
-          if (found > 1) {
-            message.channel.send(tr.questRec2);
-          } else {
-            message.channel.send(tr.questRec);
+
+          // Hope it's not anything lewd >:(
+          message.channel.send(tr.secret);
+          message.channel.stopTyping();
+          return;
+        } else if (paramCommands.dmc.includes(modifierParam) || paramCommands.spd.includes(modifierParam)) {
+          // Handle DMC/SPD
+
+          var shallow = modifierParam[0] === 's';
+          for (var channel in channels) {
+            pers.addQuestion(channels[channel], mainParam.slice(1, -1), message.author.id, shallow, function () {});
           }
+
+          // Respond to user appropriately
+          message.channel.send(tr.questRec + (shallow ? 'SPD' : 'DMC') + tr.questRec2);
+
+          // Handle cases where it's going to cause a prompt
           for (var toCheck in channels) {
             if (!pers.hasDailyQuestion(channels[toCheck]) && pers.getIsShallow(channels[toCheck]) === shallow) {
               bot.channels.get(channels[channel]).send(tr.aNewQ).then(function (message) {
@@ -130,23 +203,36 @@ pers.init(function (err) {
               });
             }
           }
-        }
-      };
 
-      if (message.content.startsWith('answer "') && message.content.endsWith('"')) {
-        // Send through to all listening channels as anon. Should take a channel param in future,
-        // once we decide how that will work generally for all denko-co apps.
-        for (var toSendAnon in channels) {
-          bot.channels.get(channels[toSendAnon]).send(tr.aS + message.content.slice(8, -1));
+          // All done!
+          message.channel.stopTyping();
+          return;
         }
-        message.channel.send(tr.secret);
-      } else if (message.content.startsWith('spd ')) {
-        saveQ(true);
       } else {
-        saveQ(false);
+        // Command is garbage, check if it was good before the patch
+        if (/".*"/.test(msgContent)) {
+          validOld = true; // validOld = !validOld xD
+        }
       }
-      message.channel.stopTyping();
+
+      // Handle things which aren't commands
+      // Could do this in the else block above, prefer to be out 1 lvl of indent.
+      if (!wasThere) {
+        message.channel.send(generateHelpText());
+      } else if (validOld) {
+        message.channel.send(tr.oldFormat);
+      } else if (!userInfo.knowsSecret) {
+        message.channel.send(tr.sadbois).then(function () {
+          setTimeout(function () {
+            message.channel.send(tr.sadbois2);
+            userInfo.knowsSecret = true;
+          }, 5000);
+        });
+      } else {
+        message.channel.send(tr.noMatch);
+      }
     });
+    message.channel.stopTyping(); // Always clean up!
   }
 
   bot.on('message', function (message) {
