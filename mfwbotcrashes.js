@@ -56,7 +56,7 @@ exports.getChannelInfo = function (channelId, isCheck, callback) {
     } else {
       var newChannel = channelInfo.insert({
         'channel': channelId,
-        'reactCount': 3,
+        'reactCount': 2,
         'downvoteId': '%E2%AC%87',
         'upvoteId': '%E2%AC%86',
         'questionOfTheDay': '', // I sure hope this works
@@ -66,7 +66,7 @@ exports.getChannelInfo = function (channelId, isCheck, callback) {
         'nextShallowQuestionToSaveId': 1,
         'isQuestionShallow': false
       });
-      addQuestion(channelId, tr.aSimpleQ1, '<3', function () {
+      addQuestion(channelId, tr.aSimpleQ1, '<3', false, function () {
         db.saveDatabase(function (err) {
           if (err) {
             callback(err);
@@ -82,7 +82,7 @@ exports.getChannelInfo = function (channelId, isCheck, callback) {
   }
 };
 
-var addQuestion = function (channelId, question, author, callback, shallow) {
+var addQuestion = function (channelId, question, author, shallow, callback) {
   var questions = shallow ? db.getCollection('shallow-questions') : db.getCollection('questions');
   var thisChannelInfo = db.getCollection('channelInfo').findOne({'channel': channelId});
   questions.insert({
