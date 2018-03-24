@@ -2,6 +2,7 @@ var L = require('lokijs'); // There are starving kids in Africa who could use th
 var tr = require('./translations.json'); // This is probably poor encapsulation, huh?
 var initalised = false;
 var db;
+var winston = require('winston');
 
 var init = function (callback) {
   if (initalised) return;
@@ -20,7 +21,7 @@ var init = function (callback) {
         if (err) {
           callback(err);
         } else {
-          console.log('Init worked, calling back.');
+          winston.info('Init worked, calling back.');
           callback();
         }
       });
@@ -31,7 +32,7 @@ var init = function (callback) {
 function createCollection (db, name) {
   var collection = db.getCollection(name);
   if (!collection) {
-    console.log('Creating collection ' + name);
+    winston.info('Creating collection ' + name);
     db.addCollection(name);
   }
 }
@@ -43,7 +44,7 @@ exports.performDataUpgrade = function (channelId) {
   thisChannelInfo.nextShallowQuestionToPostId = 1;
   thisChannelInfo.nextShallowQuestionToSaveId = 1;
   thisChannelInfo.isQuestionShallow = false;
-  console.log('Upgrade performed for channel ' + channelId);
+  winston.info('Upgrade performed for channel ' + channelId);
   db.saveDatabase();
 };
 
@@ -71,7 +72,7 @@ exports.getChannelInfo = function (channelId, isCheck, callback) {
           if (err) {
             callback(err);
           } else {
-            console.log('Channel created successfully!');
+            winston.info('Channel created successfully!');
             callback(newChannel, true);
           }
         });
@@ -95,7 +96,7 @@ var addQuestion = function (channelId, question, author, shallow, callback) {
     if (err) {
       callback(err);
     } else {
-      console.log('Question saved successfully!');
+      winston.info('Question saved successfully!');
       callback();
     }
   });
@@ -104,7 +105,7 @@ var addQuestion = function (channelId, question, author, shallow, callback) {
 exports.addQuestion = addQuestion;
 
 exports.getNextQuestion = function (channelId, check, callback, shouldFlip) {
-  console.log('Getting question for ' + channelId + ', with check as ' + check + ' and shouldFlip as ' + shouldFlip);
+  winston.info('Getting question for ' + channelId + ', with check as ' + check + ' and shouldFlip as ' + shouldFlip);
   var thisChannelInfo = db.getCollection('channelInfo').findOne({'channel': channelId});
   var shallow = shouldFlip ? !thisChannelInfo.isQuestionShallow : thisChannelInfo.isQuestionShallow;
   var questions = shallow ? db.getCollection('shallow-questions') : db.getCollection('questions');
