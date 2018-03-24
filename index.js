@@ -6,12 +6,22 @@ var tr = require('./translations.json');
 var pers = require('./mfwbotcrashes.js');
 var Discord = require('discord.js');
 var bot = new Discord.Client({autoReconnect: true});
+var winston = require('winston');
+winston.configure({
+  level: 'info',
+  transports: [
+    new (winston.transports.File)({ filename: 'errors.log' })
+  ]
+});
+winston.handleExceptions(new winston.transports.File({ filename: 'exception.log' }));
 
-bot.login(process.env.TOKEN);
+bot.login(process.env.TOKEN).catch(msg => {
+  winston.error(msg);
+});
 
 pers.init(function (err) {
   if (err) {
-    console.error(err);
+    winston.error(err);
     process.exit(1);
   }
   var channelsCron = pers.getAllChannels();
@@ -22,7 +32,7 @@ pers.init(function (err) {
   }
 
   bot.on('ready', function (event) {
-    console.log('Logged in as %s - %s\n', bot.user.username, bot.user.id);
+    winston.info('Logged in as %s - %s\n', bot.user.username, bot.user.id);
     fs.readFile('README.md', 'utf8', function (err, data) {
       if (err) throw err;
       var channels = pers.getAllChannels();
@@ -34,7 +44,7 @@ pers.init(function (err) {
           pers.performDataUpgrade(channels[channel]);
           bot.channels.get(channels[channel]).send(tr.whatHappened + releaseNote);
         } else {
-          console.log('Version matches, skipping!');
+          winston.info('Version matches, skipping!');
         }
       }
     });
