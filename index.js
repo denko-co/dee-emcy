@@ -15,7 +15,7 @@ winston.configure({
 });
 winston.handleExceptions(new winston.transports.File({ filename: 'exception.log' }));
 
-bot.login('zkyOTYwNzQ1MTIzNjEwNjM1.DZemNA.AMqWMCOo_ZInWjeQuXUvC0E6eyE').catch(msg => {
+bot.login(process.env.TOKEN).catch(msg => {
   winston.error(msg);
 });
 
