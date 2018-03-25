@@ -154,7 +154,7 @@ pers.init(function (err) {
 
     // First, split it on the first whitespace, to see what bucket we need to check
 
-    var paramReg = /^(\S*)\s*(.*)$/; // NON GLOBAL REGEX WEOW
+    var paramReg = /^(\S*)\s*([\s\S]*)$/; // NON GLOBAL REGEX WEOW
     var params = paramReg.exec(msgContent);
     var validOld = false;
     var modifierParam = params[1].toLowerCase();
