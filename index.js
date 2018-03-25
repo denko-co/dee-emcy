@@ -157,6 +157,15 @@ pers.init(function (err) {
     var paramReg = /^(\S*)\s*([\s\S]*)$/; // NON GLOBAL REGEX WEOW
     var params = paramReg.exec(msgContent);
     var validOld = false;
+
+    if (params === null) {
+      // Something has gone terribly wrong. Return a message to the user, and log the error.
+      winston.error('Failed to parse message with content ' + msgContent);
+      message.channel.send(tr.uhOh);
+      message.channel.stopTyping();
+      return;
+    }
+
     var modifierParam = params[1].toLowerCase();
     var mainParam = params[2];
 
