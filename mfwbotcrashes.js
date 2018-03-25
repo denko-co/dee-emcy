@@ -39,13 +39,19 @@ function createCollection (db, name) {
 
 exports.init = init;
 
-exports.performDataUpgrade = function (channelId) {
-  var thisChannelInfo = db.getCollection('channelInfo').findOne({'channel': channelId});
-  thisChannelInfo.nextShallowQuestionToPostId = 1;
-  thisChannelInfo.nextShallowQuestionToSaveId = 1;
-  thisChannelInfo.isQuestionShallow = false;
-  winston.info('Upgrade performed for channel ' + channelId);
-  db.saveDatabase();
+exports.performDataUpgrade = function (channelId, version) {
+  switch (version) {
+    case 'Version 1.5':
+      var thisChannelInfo = db.getCollection('channelInfo').findOne({'channel': channelId});
+      thisChannelInfo.nextShallowQuestionToPostId = 1;
+      thisChannelInfo.nextShallowQuestionToSaveId = 1;
+      thisChannelInfo.isQuestionShallow = false;
+      winston.info('Upgrade performed for channel ' + channelId);
+      db.saveDatabase();
+      break;
+    default:
+      winston.info('No upgrade required for ' + version + ' and channel ' + channelId);
+  }
 };
 
 exports.getChannelInfo = function (channelId, isCheck, callback) {
@@ -60,7 +66,7 @@ exports.getChannelInfo = function (channelId, isCheck, callback) {
         'reactCount': 3,
         'downvoteId': '%E2%AC%87',
         'upvoteId': '%E2%AC%86',
-        'questionOfTheDay': '', // I sure hope this works
+        'questionOfTheDay': null,
         'nextQuestionToPostId': 1,
         'nextQuestionToSaveId': 1,
         'nextShallowQuestionToPostId': 1,
@@ -109,7 +115,9 @@ exports.getNextQuestion = function (channelId, check, callback, shouldFlip) {
   var thisChannelInfo = db.getCollection('channelInfo').findOne({'channel': channelId});
   var shallow = shouldFlip ? !thisChannelInfo.isQuestionShallow : thisChannelInfo.isQuestionShallow;
   var questions = shallow ? db.getCollection('shallow-questions') : db.getCollection('questions');
-  var question = questions.findOne({'channel': channelId, 'questionId': shallow ? thisChannelInfo.nextShallowQuestionToPostId : thisChannelInfo.nextQuestionToPostId});
+  var questionId = shallow ? thisChannelInfo.nextShallowQuestionToPostId : thisChannelInfo.nextQuestionToPostId;
+  var question = questions.findOne({'channel': channelId, 'questionId': questionId});
+  var hasNext = questions.findOne({'channel': channelId, 'questionId': questionId + 1});
   if (!check && shouldFlip) { // Shouldn't really check and flip
     flipShallow(channelId);
   }
@@ -117,7 +125,7 @@ exports.getNextQuestion = function (channelId, check, callback, shouldFlip) {
     if (!check) {
       shallow ? thisChannelInfo.nextShallowQuestionToPostId++ : thisChannelInfo.nextQuestionToPostId++;
     }
-    callback(question, shallow);
+    callback(question, shallow, hasNext);
   } else {
     callback(null);
   }

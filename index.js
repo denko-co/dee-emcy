@@ -5,8 +5,11 @@ var app = express();
 var tr = require('./translations.json');
 var pers = require('./mfwbotcrashes.js');
 var Discord = require('discord.js');
-var bot = new Discord.Client({autoReconnect: true});
 var winston = require('winston');
+var bot = new Discord.Client({autoReconnect: true});
+
+var MAX_MESSAGE_LENGTH = 1800;
+
 winston.configure({
   level: 'info',
   transports: [
@@ -33,21 +36,7 @@ pers.init(function (err) {
 
   bot.on('ready', function (event) {
     winston.info('Logged in as %s - %s\n', bot.user.username, bot.user.id);
-    fs.readFile('README.md', 'utf8', function (err, data) {
-      if (err) throw err;
-      var channels = pers.getAllChannels();
-      var releaseNoteRegx = /(__\*\*.*\*\*__[^_]*)__\*\*/g;
-      var releaseNote = releaseNoteRegx.exec(data)[1];
-      for (var channel in channels) {
-        if (pers.getVersionText(channels[channel]) !== releaseNote) {
-          pers.setVersionText(channels[channel], releaseNote);
-          pers.performDataUpgrade(channels[channel]);
-          bot.channels.get(channels[channel]).send(tr.whatHappened + releaseNote);
-        } else {
-          winston.info('Version matches, skipping!');
-        }
-      }
-    });
+    handleCurrentVersion();
   });
 
   bot.on('messageReactionAdd', function (messageReaction) {
@@ -57,6 +46,33 @@ pers.init(function (err) {
   bot.on('messageReactionRemove', function (messageReaction) {
     handleReaction(messageReaction);
   });
+
+  function handleCurrentVersion (newChannelId) {
+    fs.readFile('README.md', 'utf8', function (err, data) {
+      if (err) throw err;
+      var channels = pers.getAllChannels();
+      var releaseNoteRegx = /(__\*\*(.*)\*\*__[^_]*)__\*\*/g;
+      var releaseNoteResult = releaseNoteRegx.exec(data);
+      var releaseNote = releaseNoteResult[1];
+      var version = releaseNoteResult[2];
+      if (newChannelId) {
+        pers.setVersionText(newChannelId, releaseNote);
+      } else {
+        // Backup the db
+        fs.createReadStream('./dmcdata.json').pipe(fs.createWriteStream('./' + 'backup_' + version.replace(/ /g, '_') + '.json'));
+        // "Upgrade" all channels
+        for (var channel in channels) {
+          if (pers.getVersionText(channels[channel]) !== releaseNote) {
+            pers.setVersionText(channels[channel], releaseNote);
+            pers.performDataUpgrade(channels[channel], version);
+            bot.channels.get(channels[channel]).send(tr.whatHappened + releaseNote);
+          } else {
+            winston.info('Version matches, skipping!');
+          }
+        }
+      }
+    });
+  }
 
   function handleReaction (messageReaction) {
     var message = messageReaction.message;
@@ -84,6 +100,14 @@ pers.init(function (err) {
 
   function handleDirectMessage (message) {
     var msgContent = message.content;
+
+    if (msgContent.length > MAX_MESSAGE_LENGTH) {
+      // Don't even read it, shoot back with a response and skip
+      var shortenBy = msgContent.length - MAX_MESSAGE_LENGTH;
+      var chars = ' character' + (shortenBy === 1 ? '' : 's');
+      message.channel.send(tr.tooLong + (msgContent.length - MAX_MESSAGE_LENGTH) + chars + tr.tooLong2);
+      return;
+    }
 
     var paramCommands = {
       answer: ['a', 'ans', 'answer', 'anon'],
@@ -162,7 +186,6 @@ pers.init(function (err) {
       // Something has gone terribly wrong. Return a message to the user, and log the error.
       winston.error('Failed to parse message with content ' + msgContent);
       message.channel.send(tr.uhOh);
-      message.channel.stopTyping();
       return;
     }
 
@@ -179,7 +202,6 @@ pers.init(function (err) {
         if (nonParamCommands.help.includes(modifierParam)) {
           // Handle help
           message.channel.send(generateHelpText());
-          message.channel.stopTyping();
           return;
         }
       } else if (mainParam.length > 2 && mainParam[0] === '"' && mainParam[mainParam.length - 1] === '"') {
@@ -195,7 +217,6 @@ pers.init(function (err) {
 
           // Hope it's not anything lewd >:(
           message.channel.send(tr.secret);
-          message.channel.stopTyping();
           return;
         } else if (paramCommands.dmc.includes(modifierParam) || paramCommands.spd.includes(modifierParam)) {
           // Handle DMC/SPD
@@ -224,7 +245,6 @@ pers.init(function (err) {
           }
 
           // All done!
-          message.channel.stopTyping();
           return;
         }
       } else {
@@ -242,8 +262,10 @@ pers.init(function (err) {
         message.channel.send(tr.oldFormat);
       } else if (!userInfo.knowsSecret) {
         message.channel.send(tr.sadbois).then(function () {
+          message.channel.startTyping();
           setTimeout(function () {
             message.channel.send(tr.sadbois2);
+            message.channel.stopTyping();
             userInfo.knowsSecret = true;
           }, 5000);
         });
@@ -251,7 +273,6 @@ pers.init(function (err) {
         message.channel.send(tr.noMatch);
       }
     });
-    message.channel.stopTyping(); // Always clean up!
   }
 
   bot.on('message', function (message) {
@@ -260,14 +281,12 @@ pers.init(function (err) {
       if (message.channel instanceof Discord.DMChannel) {
         message.channel.startTyping();
         setTimeout(handleDirectMessage, 2000, message);
-        return;
-      }
-      if (message.content === tr.introduceYourself) {
+        message.channel.stopTyping();
+      } else if (message.content === tr.introduceYourself) {
         message.channel.send(tr.dontPurge).then(function () {
           postNewMessage(message.channel, false);
         });
-      }
-      if (message.content === tr.flip) {
+      } else if (message.content === tr.flip) {
         pers.getChannelInfo(message.channel.id, true, function (channelInfo) {
           if (channelInfo !== null) {
             pers.flipShallow(message.channel.id);
@@ -281,6 +300,7 @@ pers.init(function (err) {
   function postNewMessage (channel, shouldFlip) {
     pers.getChannelInfo(channel.id, false, function (channelInfo, isNewChannel) {
       if (isNewChannel) {
+        handleCurrentVersion(channel.id);
         cron.schedule('0 2,21 * * *', function () {
           postNewMessage(bot.channels.get(channel.id), true);
         });
@@ -292,23 +312,21 @@ pers.init(function (err) {
           }
         });
       }
-      pers.getNextQuestion(channel.id, false, function (question, shallow) {
+      pers.getNextQuestion(channel.id, false, function (question, shallow, hasNext) {
         if (question === null) {
           channel.send(tr.allOut).then(function (message) {
             pers.setQuestionMessageId(message.channel.id, null, function () {});
           });
         } else {
-          pers.getNextQuestion(channel.id, true, function (nextQ) {
-            var needQ = (nextQ === null) ? tr.noQTommorrow : '';
-            channel.send(`***Today's ${shallow ? 'shallow and pointless' : 'deep and meaningful'} question is: ***` + question.question + needQ).then(function (message) {
-              message.react(channelInfo.upvoteId).then(function (reactionAdded) {
-                message.react(channelInfo.downvoteId);
-              });
-              message.pin();
-              pers.setQuestionMessageId(message.channel.id, message.id, function () {});
-              pers.setAsked(message.channel.id, false);
+          var needQ = (hasNext === null) ? tr.noQTommorrow : '';
+          channel.send(`***Today's ${shallow ? 'shallow and pointless' : 'deep and meaningful'} question is: ***` + question.question + needQ).then(function (message) {
+            message.react(channelInfo.upvoteId).then(function (reactionAdded) {
+              message.react(channelInfo.downvoteId);
             });
-          }, false);
+            message.pin();
+            pers.setQuestionMessageId(message.channel.id, message.id, function () {});
+            pers.setAsked(message.channel.id, false);
+          });
         }
       }, shouldFlip);
     });
