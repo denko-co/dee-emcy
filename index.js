@@ -5,8 +5,11 @@ var app = express();
 var tr = require('./translations.json');
 var pers = require('./mfwbotcrashes.js');
 var Discord = require('discord.js');
-var bot = new Discord.Client({autoReconnect: true});
 var winston = require('winston');
+var bot = new Discord.Client({autoReconnect: true});
+
+var MAX_MESSAGE_LENGTH = 1800;
+
 winston.configure({
   level: 'info',
   transports: [
@@ -85,6 +88,14 @@ pers.init(function (err) {
   function handleDirectMessage (message) {
     var msgContent = message.content;
 
+    if (msgContent.length > MAX_MESSAGE_LENGTH) {
+      // Don't even read it, shoot back with a response and skip
+      var shortenBy = msgContent.length - MAX_MESSAGE_LENGTH;
+      var chars = ' character' + (shortenBy === 1 ? '' : 's');
+      message.channel.send(tr.tooLong + (msgContent.length - MAX_MESSAGE_LENGTH) + chars + tr.tooLong2);
+      return;
+    }
+
     var paramCommands = {
       answer: ['a', 'ans', 'answer', 'anon'],
       dmc: ['d', 'dmc'],
@@ -162,7 +173,6 @@ pers.init(function (err) {
       // Something has gone terribly wrong. Return a message to the user, and log the error.
       winston.error('Failed to parse message with content ' + msgContent);
       message.channel.send(tr.uhOh);
-      message.channel.stopTyping();
       return;
     }
 
@@ -179,7 +189,6 @@ pers.init(function (err) {
         if (nonParamCommands.help.includes(modifierParam)) {
           // Handle help
           message.channel.send(generateHelpText());
-          message.channel.stopTyping();
           return;
         }
       } else if (mainParam.length > 2 && mainParam[0] === '"' && mainParam[mainParam.length - 1] === '"') {
@@ -195,7 +204,6 @@ pers.init(function (err) {
 
           // Hope it's not anything lewd >:(
           message.channel.send(tr.secret);
-          message.channel.stopTyping();
           return;
         } else if (paramCommands.dmc.includes(modifierParam) || paramCommands.spd.includes(modifierParam)) {
           // Handle DMC/SPD
@@ -224,7 +232,6 @@ pers.init(function (err) {
           }
 
           // All done!
-          message.channel.stopTyping();
           return;
         }
       } else {
@@ -242,8 +249,10 @@ pers.init(function (err) {
         message.channel.send(tr.oldFormat);
       } else if (!userInfo.knowsSecret) {
         message.channel.send(tr.sadbois).then(function () {
+          message.channel.startTyping();
           setTimeout(function () {
             message.channel.send(tr.sadbois2);
+            message.channel.stopTyping();
             userInfo.knowsSecret = true;
           }, 5000);
         });
@@ -251,7 +260,6 @@ pers.init(function (err) {
         message.channel.send(tr.noMatch);
       }
     });
-    message.channel.stopTyping(); // Always clean up!
   }
 
   bot.on('message', function (message) {
@@ -260,14 +268,12 @@ pers.init(function (err) {
       if (message.channel instanceof Discord.DMChannel) {
         message.channel.startTyping();
         setTimeout(handleDirectMessage, 2000, message);
-        return;
-      }
-      if (message.content === tr.introduceYourself) {
+        message.channel.stopTyping();
+      } else if (message.content === tr.introduceYourself) {
         message.channel.send(tr.dontPurge).then(function () {
           postNewMessage(message.channel, false);
         });
-      }
-      if (message.content === tr.flip) {
+      } else if (message.content === tr.flip) {
         pers.getChannelInfo(message.channel.id, true, function (channelInfo) {
           if (channelInfo !== null) {
             pers.flipShallow(message.channel.id);
