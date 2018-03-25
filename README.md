@@ -1,6 +1,12 @@
 # dee-emcy
 Hey, nice to meet you! o(*>ω&lt;*)o
 
+__**Version 1.6.1**__
+
+* Fixed questions that are too long causing Dee not to post. Max limit is 1800!
+* Many exciting behind the scenes maintenance improvements!
+* New Dee profile pic. <3
+
 __**Version 1.6**__
 
 * Dee now only saves questions when a command is specified, and has more commands she responds to, including a fancy new `help` command!

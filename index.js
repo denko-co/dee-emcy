@@ -36,21 +36,7 @@ pers.init(function (err) {
 
   bot.on('ready', function (event) {
     winston.info('Logged in as %s - %s\n', bot.user.username, bot.user.id);
-    fs.readFile('README.md', 'utf8', function (err, data) {
-      if (err) throw err;
-      var channels = pers.getAllChannels();
-      var releaseNoteRegx = /(__\*\*.*\*\*__[^_]*)__\*\*/g;
-      var releaseNote = releaseNoteRegx.exec(data)[1];
-      for (var channel in channels) {
-        if (pers.getVersionText(channels[channel]) !== releaseNote) {
-          pers.setVersionText(channels[channel], releaseNote);
-          pers.performDataUpgrade(channels[channel]);
-          bot.channels.get(channels[channel]).send(tr.whatHappened + releaseNote);
-        } else {
-          winston.info('Version matches, skipping!');
-        }
-      }
-    });
+    handleCurrentVersion();
   });
 
   bot.on('messageReactionAdd', function (messageReaction) {
@@ -60,6 +46,33 @@ pers.init(function (err) {
   bot.on('messageReactionRemove', function (messageReaction) {
     handleReaction(messageReaction);
   });
+
+  function handleCurrentVersion (newChannelId) {
+    fs.readFile('README.md', 'utf8', function (err, data) {
+      if (err) throw err;
+      var channels = pers.getAllChannels();
+      var releaseNoteRegx = /(__\*\*(.*)\*\*__[^_]*)__\*\*/g;
+      var releaseNoteResult = releaseNoteRegx.exec(data);
+      var releaseNote = releaseNoteResult[1];
+      var version = releaseNoteResult[2];
+      if (newChannelId) {
+        pers.setVersionText(newChannelId, releaseNote);
+      } else {
+        // Backup the db
+        fs.createReadStream('./dmcdata.json').pipe(fs.createWriteStream('./' + 'backup_' + version.replace(/ /g, '_') + '.json'));
+        // "Upgrade" all channels
+        for (var channel in channels) {
+          if (pers.getVersionText(channels[channel]) !== releaseNote) {
+            pers.setVersionText(channels[channel], releaseNote);
+            pers.performDataUpgrade(channels[channel], version);
+            bot.channels.get(channels[channel]).send(tr.whatHappened + releaseNote);
+          } else {
+            winston.info('Version matches, skipping!');
+          }
+        }
+      }
+    });
+  }
 
   function handleReaction (messageReaction) {
     var message = messageReaction.message;
@@ -287,6 +300,7 @@ pers.init(function (err) {
   function postNewMessage (channel, shouldFlip) {
     pers.getChannelInfo(channel.id, false, function (channelInfo, isNewChannel) {
       if (isNewChannel) {
+        handleCurrentVersion(channel.id);
         cron.schedule('0 2,21 * * *', function () {
           postNewMessage(bot.channels.get(channel.id), true);
         });
@@ -298,23 +312,21 @@ pers.init(function (err) {
           }
         });
       }
-      pers.getNextQuestion(channel.id, false, function (question, shallow) {
+      pers.getNextQuestion(channel.id, false, function (question, shallow, hasNext) {
         if (question === null) {
           channel.send(tr.allOut).then(function (message) {
             pers.setQuestionMessageId(message.channel.id, null, function () {});
           });
         } else {
-          pers.getNextQuestion(channel.id, true, function (nextQ) {
-            var needQ = (nextQ === null) ? tr.noQTommorrow : '';
-            channel.send(`***Today's ${shallow ? 'shallow and pointless' : 'deep and meaningful'} question is: ***` + question.question + needQ).then(function (message) {
-              message.react(channelInfo.upvoteId).then(function (reactionAdded) {
-                message.react(channelInfo.downvoteId);
-              });
-              message.pin();
-              pers.setQuestionMessageId(message.channel.id, message.id, function () {});
-              pers.setAsked(message.channel.id, false);
+          var needQ = (hasNext === null) ? tr.noQTommorrow : '';
+          channel.send(`***Today's ${shallow ? 'shallow and pointless' : 'deep and meaningful'} question is: ***` + question.question + needQ).then(function (message) {
+            message.react(channelInfo.upvoteId).then(function (reactionAdded) {
+              message.react(channelInfo.downvoteId);
             });
-          }, false);
+            message.pin();
+            pers.setQuestionMessageId(message.channel.id, message.id, function () {});
+            pers.setAsked(message.channel.id, false);
+          });
         }
       }, shouldFlip);
     });
