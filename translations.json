@@ -2,7 +2,7 @@
   "helpText1" : "Hey! Dee here. I'd love to chat with you (within the realms of what I understand, aheh :3). Here's a list of things I know ~\n",
   "helpText2" : "\nIf you type these below, and that's it (extra -'s at the start are okies too), you'll get the following:\n",
   "helpText3" : "\nIf you type these ones, plus something in quotes `\"like this\"`, here's what I can do!\n",
-  "helpText4" : "\nI have some other things I know about as well, but I'll tell you another time. I look forward to hearing from you! <3",
+  "helpText4" : "\nI have some other things I know about, but I'll tell you some other time ;). I look forward to hearing from you! <3",
   "sadbois" : "Hmmm... can I tell you a secret? Yeah? Okies... here goes...",
   "sadbois2" : "I'm not real! I have no idea what you said! D: Maybe someday though, yeah? ;)",
   "questRec" : "Ooh, that's a good ",
@@ -14,10 +14,11 @@
   "aNewQ" : "owo, what's this? A new question? If you wanna see it, let me know! Three :arrow_up: reacts, and I'll show! (Hey, that rhymed! :3) If you prefer suspense, you can also :arrow_down: and it'll cancel them out like usual.",
   "secret" : "Okies! I'll pass that on! <3",
   "aS" : "Anon says ~ ",
+  "uhOh" : "Uh oh! Something has gone wrong! Call the fire brigade! Call tech support! Call the president! Actually, don't call him! Raise an issue! https://github.com/denko-co/dee-emcy/issues/new",
   "noQTommorrow" : " - oh, and by the way, after this, I'm all out of questions! Hopefully someone can help me out? :3",
   "flip" : "Do a flip!",
   "barrel" : "I prefer barrel rolls. :3",
   "noMatch" : "...  :3",
-  "oldFormat" : "Omai! Such a forgetful! You've got to be a bit more specific! Wouldn't want to misplace something, yeah? ;) Maybe you need some --help?",
+  "oldFormat" : "Omai, you've got to be a bit more specific! Wouldn't want to misplace something, yeah? ;) Maybe you need some --help?",
   "dontPurge" : "Hey everyone! Dee here, nice to meet you! Every day, I'll post a question! Then, it's up to you!\nAt days end (or if a question gets three more :arrow_down: reacts than :arrow_up:), I'll post a new question! \nIt's gonna be so much fun! :D If you want to add a question to the pool, or wanna post all anon-like, just shoot me a DM!\nThanks for reading! <3"
 }
