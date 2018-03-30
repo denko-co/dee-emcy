@@ -40,17 +40,30 @@ function createCollection (db, name) {
 exports.init = init;
 
 exports.performDataUpgrade = function (channelId, version) {
+  var thisChannelInfo = db.getCollection('channelInfo').findOne({'channel': channelId});
+  var logInfo = version + ' and channel ' + channelId;
+  var noUpgrade = false;
   switch (version) {
+    case 'Version 1.7':
+      thisChannelInfo.onBreak = null;
+      thisChannelInfo.activity = {
+        'day-off': 0,
+        'weekend': 0,
+        'long-weekend': 0
+      };
+      break;
     case 'Version 1.5':
-      var thisChannelInfo = db.getCollection('channelInfo').findOne({'channel': channelId});
       thisChannelInfo.nextShallowQuestionToPostId = 1;
       thisChannelInfo.nextShallowQuestionToSaveId = 1;
       thisChannelInfo.isQuestionShallow = false;
-      winston.info('Upgrade performed for channel ' + channelId);
-      db.saveDatabase();
       break;
     default:
-      winston.info('No upgrade required for ' + version + ' and channel ' + channelId);
+      winston.info('No upgrade required for ' + logInfo);
+      noUpgrade = true;
+  }
+  if (!noUpgrade) {
+    winston.info('Upgrade performed for ' + logInfo);
+    db.saveDatabase();
   }
 };
 
@@ -71,7 +84,13 @@ exports.getChannelInfo = function (channelId, isCheck, callback) {
         'nextQuestionToSaveId': 1,
         'nextShallowQuestionToPostId': 1,
         'nextShallowQuestionToSaveId': 1,
-        'isQuestionShallow': false
+        'isQuestionShallow': false,
+        'onBreak': null,
+        'activityInfo': {
+          'day-off': 0,
+          'weekend': 0,
+          'long-weekend': 0
+        }
       });
       addQuestion(channelId, tr.aSimpleQ1, '<3', false, function () {
         db.saveDatabase(function (err) {
@@ -200,3 +219,23 @@ var flipShallow = function (channelId) {
 };
 
 exports.flipShallow = flipShallow;
+
+// Maybe we should clean this up as a generic getAttribute?
+
+exports.getOnBreak = function (channelId) {
+  return db.getCollection('channelInfo').findOne({'channel': channelId}).onBreak;
+};
+
+exports.setOnBreak = function (channelId, value) {
+  db.getCollection('channelInfo').findOne({'channel': channelId}).onBreak = value;
+  db.saveDatabase();
+};
+
+exports.getActivityInfo = function (channelId, activity) {
+  return db.getCollection('channelInfo').findOne({'channel': channelId}).activity[activity];
+};
+
+exports.setActivityInfo = function (channelId, activity, value) {
+  db.getCollection('channelInfo').findOne({'channel': channelId}).activity[activity] = value;
+  db.saveDatabase();
+};

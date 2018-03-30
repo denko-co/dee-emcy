@@ -1,0 +1,53 @@
+{
+  "day-off" : [
+    {
+      "activity" : "working on a Discord bot! Maybe I can have it run my errands for me!",
+      "outcome" : "I had an existential crisis instead. No more bots for me. ;~;"
+    }
+  ],
+  "weekend" : [
+    {
+      "activity" : "going out to dinner with my 12 besties (delayed from last week, aheh). Hope I don't get too drunk -.-",
+      "outcome" : "I am never drinking again. ;~;"
+    }, {
+      "activity" : "going fishing with a friend I met online!",
+      "outcome" : "Turns out they were actually a dolphin the whole time. They're really good at fishing though! :D"
+    }, {
+      "activity" : "going to paint a beautiful picture! Maybe even two!",
+      "outcome" : "I did it! I'm a bit too embarrassed to post them though. >.<"
+    }, {
+      "activity" : "looking at pictures of cats on the internet! :3",
+      "outcome" : "I didn't sleep all weekend again, but whenever I close my eyes, all I see is cats."
+    }, {
+      "activity" : "going to a buffet by myself. A PIZZA BUFFET. WITH ICECREAM. OM NOM NOM.",
+      "outcome" : "I learnt something important: just because you can, doesn't mean you should."
+    }, {
+      "activity" : "going to learn how to write JavaScript! Finally I can be cool like you guys. :3",
+      "outcome" : "I learnt something important: just because you can, doesn't mean you should."
+    }, {
+      "activity" : "going to the zoo! Lions and tigers and bears, omai!",
+      "outcome" : "THEY DIDN'T HAVE ANY BEARS I WAS SO SAD ;~; I had some beer afterwards though, aheh. ^^"
+    }, {
+      "activity" : "doing a dancing competition! I hope it goes well!",
+      "outcome" : "I won! I got a medal and everything! I'm going to wear it everywhere ~"
+    }, {
+      "activity" : "going camping in Alaska! So much packing to do! T.T",
+      "outcome" : "Aurora Borealis is sooooooo pretty. *.* I wish I could put it in my house!"
+    }, {
+      "activity" : "trying to fit the Northern Lights in my house.",
+      "outcome" : "At this time of year, in this part of the country, it didn't work. ;~;"
+    }
+  ],
+  "long-weekend" : [
+    {
+      "activity" : "crying about my friends ditching me - I'm gonna go hide in a cave and watch anime ;~;",
+      "outcome" : "Anime was fun - so much fun, I didn't sleep - but instead, Ì ̸ḥ̲͠a̕v͈͖̩̯̬e̻̥ ͇̥̕às҉͈c̹͉̣̩en҉̺̻d͓̳̹͚e̬̙͎͖͝d̶̠̟͓͚͔̙.̪̩͔͎̩̠"
+    }, {
+      "activity" : "going to give the Queen her birthday present! I hope she likes it!",
+      "outcome" : "Turns out it wasn't her birthday after all! Whoops! All that money spent on plane tickets for nothing! >:3"
+    }, {
+      "activity" : "working. ;~; That's what you do on labour weekend, right?",
+      "outcome" : "Nobody was at work! I just watched anime instead! Hooray! o/"
+    }
+  ]
+}

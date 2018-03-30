@@ -1,6 +1,10 @@
 # dee-emcy
 Hey, nice to meet you! o(*>ω&lt;*)o
 
+__**Version 1.7**__
+
+* https://www.youtube.com/watch?v=5Rswx2Z7SDw
+
 __**Version 1.6.1**__
 
 * Fixed questions that are too long causing Dee not to post. Max limit is 1800!
