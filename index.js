@@ -1,14 +1,14 @@
 var fs = require('fs');
 var CronJob = require('cron').CronJob;
+var winston = require('winston');
+var moment = require('moment-timezone');
 var express = require('express');
 var app = express();
 var tr = require('./translations.json');
 var activities = require('./activities.json');
 var pers = require('./mfwbotcrashes.js');
 var Discord = require('discord.js');
-var winston = require('winston');
 var bot = new Discord.Client({autoReconnect: true});
-var moment = require('moment-timezone');
 
 var MAX_MESSAGE_LENGTH = 1800;
 var CRON_TIMING = '0 10,18 * * *';
@@ -370,7 +370,7 @@ pers.init(function (err) {
       if (shouldFlip) {
         // Check if they are currently on on break
         var onBreak = pers.getOnBreak(channel.id);
-        if (onBreak == null) {
+        if (onBreak === null) {
           // Dee not on break, check if she should be
           var days = daysTillWork();
           if (days !== 0) {
