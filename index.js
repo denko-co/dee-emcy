@@ -11,7 +11,7 @@ var Discord = require('discord.js');
 var bot = new Discord.Client({autoReconnect: true});
 
 var MAX_MESSAGE_LENGTH = 1800;
-var CRON_TIMING = '0 10,18 * * *';
+var CRON_TIMING = '0 10,15 * * *';
 var TIMEZONE = 'Pacific/Auckland';
 var HOLIDAY_API = [ // xD
   '30-03-2018',
