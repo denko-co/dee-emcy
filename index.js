@@ -1,24 +1,38 @@
 var fs = require('fs');
-var cron = require('node-cron');
+var CronJob = require('cron').CronJob;
+var winston = require('winston');
+var moment = require('moment-timezone');
 var express = require('express');
 var app = express();
 var tr = require('./translations.json');
+var activities = require('./activities.json');
 var pers = require('./mfwbotcrashes.js');
 var Discord = require('discord.js');
-var winston = require('winston');
 var bot = new Discord.Client({autoReconnect: true});
 
 var MAX_MESSAGE_LENGTH = 1800;
+var CRON_TIMING = '0 10,18 * * *';
+var TIMEZONE = 'Pacific/Auckland';
+var HOLIDAY_API = [ // xD
+  '30-03-2018',
+  '02-04-2018', '25-04-2018',
+  '04-06-2018', '22-10-2018', '25-12-2018',
+  '26-12-2018'
+];
 
 winston.configure({
   level: 'info',
   transports: [
-    new (winston.transports.File)({ filename: 'errors.log' })
+    new winston.transports.Console(),
+    new winston.transports.File({ filename: 'combined.log' })
+  ],
+  exceptionHandlers: [
+    new winston.transports.Console(),
+    new winston.transports.File({ filename: 'exception.log' })
   ]
 });
-winston.handleExceptions(new winston.transports.File({ filename: 'exception.log' }));
 
-bot.login(process.env.TOKEN).catch(msg => {
+bot.login(process.env.TOKEN).catch(function (msg) {
   winston.error(msg);
 });
 
@@ -29,9 +43,16 @@ pers.init(function (err) {
   }
   var channelsCron = pers.getAllChannels();
   for (var channel in channelsCron) {
-    cron.schedule('0 2,21 * * *', function () {
-      postNewMessage(bot.channels.get(channelsCron[channel]), true);
+    var oldJob = new CronJob({
+      cronTime: CRON_TIMING,
+      onTick: function () {
+        postNewMessage(bot.channels.get(channelsCron[channel]), true);
+      },
+      start: false,
+      timeZone: TIMEZONE
     });
+    oldJob.start();
+    winston.info('CronJob created for old channel ' + channelsCron[channel]);
   }
 
   bot.on('ready', function (event) {
@@ -231,7 +252,7 @@ pers.init(function (err) {
 
           // Handle cases where it's going to cause a prompt
           for (var toCheck in channels) {
-            if (!pers.hasDailyQuestion(channels[toCheck]) && pers.getIsShallow(channels[toCheck]) === shallow) {
+            if (!pers.hasDailyQuestion(channels[toCheck]) && pers.getIsShallow(channels[toCheck]) === shallow && pers.getOnBreak(channels[toCheck]) === null) {
               bot.channels.get(channels[channel]).send(tr.aNewQ).then(function (message) {
                 pers.getChannelInfo(channels[channel], true, function (channelInfo) {
                   message.react(channelInfo.upvoteId).then(function (reactionAdded) {
@@ -297,13 +318,45 @@ pers.init(function (err) {
     }
   });
 
+  function daysTillWork () {
+    var today = moment().tz(TIMEZONE);
+    var formattedToday = today.format('DD-MM-YYYY');
+    var dayToday = today.format('dddd');
+    var daysTillWork = 0;
+    while (true) { // monkaGun
+      if (isTodayHoliday(formattedToday) || dayToday === 'Saturday' || dayToday === 'Sunday') {
+        daysTillWork++;
+        today.add(1, 'days');
+        formattedToday = today.format('DD-MM-YYYY');
+        dayToday = today.format('dddd');
+      } else {
+        break;
+      }
+    }
+    return daysTillWork;
+  }
+
+  function isTodayHoliday (formattedDate) {
+    // This will eventually need to be swapped out for an API call,
+    // but this codebase has avoided async for a while, so if I were to add
+    // it I'd want to make everything else promise-based as well.
+    return HOLIDAY_API.includes(formattedDate);
+  }
+
   function postNewMessage (channel, shouldFlip) {
     pers.getChannelInfo(channel.id, false, function (channelInfo, isNewChannel) {
       if (isNewChannel) {
         handleCurrentVersion(channel.id);
-        cron.schedule('0 2,21 * * *', function () {
-          postNewMessage(bot.channels.get(channel.id), true);
+        var newJob = new CronJob({
+          cronTime: CRON_TIMING,
+          onTick: function () {
+            postNewMessage(bot.channels.get(channel.id), true);
+          },
+          start: false,
+          timeZone: TIMEZONE
         });
+        newJob.start();
+        winston.info('CronJob created for new channel ' + channel.id);
       }
       if (channelInfo.questionOfTheDay !== null) {
         channel.fetchMessage(channelInfo.questionOfTheDay).then(function (message) {
@@ -312,6 +365,54 @@ pers.init(function (err) {
           }
         });
       }
+
+      // Handle holiday mode if a question hasn't been forced (indicated by a shouldFlip)
+      if (shouldFlip) {
+        // Check if they are currently on on break
+        var onBreak = pers.getOnBreak(channel.id);
+        if (onBreak === null) {
+          // Dee not on break, check if she should be
+          var days = daysTillWork();
+          if (days !== 0) {
+            var type = 'weekend';
+            if (days === 1) {
+              type = 'day-off';
+            } else if (days > 2) {
+              type = 'long-weekend';
+            }
+            var activityNum = pers.getActivityInfo(channel.id, type);
+            var activity = activities[type][activityNum];
+            if (activity === undefined) {
+              activity = tr.defaultActivity;
+            } else {
+              activity = activity.activity;
+            }
+            channel.send(tr.breakTiem + tr[type] + activity + tr.cya);
+            pers.setQuestionMessageId(channel.id, null, function () {});
+            pers.setOnBreak(channel.id, type);
+            return; // All done!
+          } // else nothing to do
+        } else {
+          // Dee on break, check if she shouldn't be
+          var daysLeft = daysTillWork();
+          if (daysLeft === 0) {
+            var activityCompletedNum = pers.getActivityInfo(channel.id, onBreak);
+            var activityCompleted = activities[onBreak][activityCompletedNum];
+            if (activityCompleted === undefined) {
+              activityCompleted = tr.defaultOutcome;
+            } else {
+              activityCompleted = activityCompleted.outcome;
+              pers.setActivityInfo(channel.id, onBreak, activityCompletedNum + 1);
+            }
+            channel.send(tr.imBack + activityCompleted);
+            pers.setOnBreak(channel.id, null);
+            // Continue with q asking
+          } else {
+            return;
+          }
+        }
+      }
+
       pers.getNextQuestion(channel.id, false, function (question, shallow, hasNext) {
         if (question === null) {
           channel.send(tr.allOut).then(function (message) {
@@ -319,7 +420,7 @@ pers.init(function (err) {
           });
         } else {
           var needQ = (hasNext === null) ? tr.noQTommorrow : '';
-          channel.send(`***Today's ${shallow ? 'shallow and pointless' : 'deep and meaningful'} question is: ***` + question.question + needQ).then(function (message) {
+          channel.send('***Today\'s ' + (shallow ? 'shallow and pointless' : 'deep and meaningful') + ' question is: ***' + question.question + needQ).then(function (message) {
             message.react(channelInfo.upvoteId).then(function (reactionAdded) {
               message.react(channelInfo.downvoteId);
             });
@@ -331,31 +432,6 @@ pers.init(function (err) {
       }, shouldFlip);
     });
   }
-
-  /*
-  CURRENTLY UNUSED, DON'T LOSE THIS THOUGH
-  function deletThis (channel) {
-    return channel.fetchMessages({limit: 100}).then(function (messages) {
-      messages = messages.filter(function (ele) {
-        return !(ele.content === tr.dontPurge && ele.author.id === bot.user.id);
-      });
-      var toDelete = messages.array().length;
-      if (toDelete !== 0) {
-        console.log('I\'ve got ' + toDelete + ' messages! Wow!');
-        if (toDelete === 1) {
-          postNewMessage(channel);
-          return messages.first().delete();
-        }
-        return channel.bulkDelete(messages).then(function () {
-          console.log('Going again!');
-          deletThis(channel);
-        });
-      } else {
-        postNewMessage(channel);
-      }
-    });
-  }
-  */
 });
 
 app.set('port', (process.env.PORT || 5000));
