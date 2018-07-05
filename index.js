@@ -157,7 +157,8 @@ pers.init(function (err) {
     var paramCommands = {
       answer: ['a', 'ans', 'answer', 'anon'],
       dmc: ['d', 'dmc'],
-      spd: ['s', 'spd']
+      spd: ['s', 'spd'],
+      optIn: ['opt']
     };
 
     var paramCommandsDetails = {
@@ -172,6 +173,10 @@ pers.init(function (err) {
       spd: {
         description: 'If you\'ve got something a bit more lighthearted to discuss, that\'s okies too! ^^ I will post that one morning as well.',
         usage: 'spd "How many holes does a straw have, one or two?"'
+      },
+      opt: {
+        description: 'Opt in or out of advanced stats, this will keep track of which questions you submit, but allow for detailed stats (eventually) and question editing more than ten minutes after submission (also eventually). Don\'t worry though, you are opted out by default ;)',
+        usage: 'opt in'
       }
     };
 
@@ -236,10 +241,11 @@ pers.init(function (err) {
 
     var modifierParam = params[1].toLowerCase();
     var mainParam = params[2];
+    var userId = message.author.id;
 
     // Ready to rumble! Grab the current user, start parsing input.
 
-    pers.getUserInfo(message.author.id, function (userInfo, wasThere) {
+    pers.getUserInfo(userId, function (userInfo, wasThere) {
       var channels = pers.getAllChannels();
 
       // Check if second param is empty, if so, run non-param checkLoops
@@ -268,7 +274,7 @@ pers.init(function (err) {
 
           var shallow = modifierParam[0] === 's';
           for (var channel in channels) {
-            pers.addQuestion(channels[channel], mainParam.slice(1, -1), getHashedUid(message.author.id), shallow, function () {});
+            pers.addQuestion(channels[channel], mainParam.slice(1, -1), userInfo.isOptedInToStats ? message.author.id : getHashedUid(message.author.id), shallow, function () {});
           }
 
           // Respond to user appropriately
@@ -291,6 +297,18 @@ pers.init(function (err) {
 
           // All done!
           return;
+        } else if (paramCommands.opt.includes(modifierParam)) {
+          if (mainParam === 'in') {
+            pers.optUserInToStats(userId, function () {
+              message.channel.send(tr.optedIn);
+            });
+          } else if (mainParam === 'out') {
+            pers.optUseroutOfStats(userId, function () {
+              message.channel.send(tr.optedOut);
+            });
+          } else {
+            message.channel.send(generateHelpText());
+          }
         }
       } else {
         // Command is garbage, check if it was good before the patch

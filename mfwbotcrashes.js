@@ -167,7 +167,7 @@ exports.setQuestionMessageId = function (channelId, messageId, callback) {
   });
 };
 
-exports.getUserInfo = function (userId, callback) {
+var getUserInfo = function (userId, callback) {
   var users = db.getCollection('userInfo');
   var user = users.findOne({'user': userId});
   if (user) {
@@ -175,9 +175,29 @@ exports.getUserInfo = function (userId, callback) {
   } else {
     return callback(users.insert({
       'user': userId,
-      'knowsSecret': false
+      'knowsSecret': false,
+      'isOptedInToStats': false
     }), false);
   }
+};
+
+exports.getUserInfo = getUserInfo;
+
+var updateUserOptedIn = function (userId, optedIn, callback) {
+  var users = db.getCollection('userInfo');
+  getUserInfo(userId, function (userInfo) {
+    userInfo.isOptedInToStats = optedIn;
+    users.update(userInfo);
+    callback();
+  });
+};
+
+exports.optUserInToStats = function (userId, callback) {
+  updateUserOptedIn(userId, true, callback);
+};
+
+exports.optUserOutOfStats = function (userId, callback) {
+  updateUserOptedIn(userId, false, callback);
 };
 
 exports.getAllChannels = function () {
