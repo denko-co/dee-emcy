@@ -1,4 +1,5 @@
 var fs = require('fs');
+var crypto = require('crypto');
 var CronJob = require('cron').CronJob;
 var winston = require('winston');
 var moment = require('moment-timezone');
@@ -67,6 +68,29 @@ pers.init(function (err) {
   bot.on('messageReactionRemove', function (messageReaction) {
     handleReaction(messageReaction);
   });
+
+  var bytes;
+  function getSecureRandomData () {
+    if (!bytes || bytes.generated.isBefore(moment().subtract(10, 'minutes'))) {
+      // New random bytes every hour
+      bytes = {
+        data: crypto.randomBytes(64).toString('hex'),
+        generated: moment()
+      };
+    }
+
+    return bytes.data;
+  }
+
+  /**
+   * Gets the hash of the given user ID, this will remain the same for ten nimutes after the user
+   * has posted allowing edits without persisting a user id that can be deduced.
+   */
+  function getHashedUid (uid) {
+    var hash = crypto.createHash('sha256');
+    hash.data(uid + getSecureRandomData());
+    return hash.digest('hex');
+  }
 
   function handleCurrentVersion (newChannelId) {
     fs.readFile('README.md', 'utf8', function (err, data) {
@@ -244,7 +268,7 @@ pers.init(function (err) {
 
           var shallow = modifierParam[0] === 's';
           for (var channel in channels) {
-            pers.addQuestion(channels[channel], mainParam.slice(1, -1), message.author.id, shallow, function () {});
+            pers.addQuestion(channels[channel], mainParam.slice(1, -1), getHashedUid(message.author.id), shallow, function () {});
           }
 
           // Respond to user appropriately
