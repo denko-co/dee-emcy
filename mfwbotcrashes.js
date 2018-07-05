@@ -188,6 +188,7 @@ var updateUserOptedIn = function (userId, optedIn, callback) {
   getUserInfo(userId, function (userInfo) {
     userInfo.isOptedInToStats = optedIn;
     users.update(userInfo);
+    db.saveDatabase();
     callback();
   });
 };
@@ -197,6 +198,9 @@ exports.optUserInToStats = function (userId, callback) {
 };
 
 exports.optUserOutOfStats = function (userId, callback) {
+  db.getCollection('questions').findAndUpdate({ author: userId }, function (entry) {
+    entry.author = '';
+  });
   updateUserOptedIn(userId, false, callback);
 };
 

@@ -175,7 +175,7 @@ pers.init(function (err) {
         usage: 'spd "How many holes does a straw have, one or two?"'
       },
       opt: {
-        description: 'Opt in or out of advanced stats, this will keep track of which questions you submit, but allow for detailed stats (eventually) and question editing more than ten minutes after submission (also eventually). Don\'t worry though, you are opted out by default ;)',
+        description: 'Opt in or out of advanced stats, this will keep track of which questions you submit, but allow for detailed stats (eventually) and question editing more than ten minutes after submission (also eventually). Don\'t worry though, you are opted out by default ;). If you explicitely tell me to opt you out, I will make sure there are no stray questions attributed to you from back in the day.',
         usage: 'opt in'
       }
     };
