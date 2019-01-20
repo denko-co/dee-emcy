@@ -303,7 +303,7 @@ pers.init(function (err) {
 
   bot.on('message', function (message) {
     if (!message.author.bot) {
-      console.log(message.author.username + ' - ' + message.author.id + ' - ' + message.channel.id + ' - ' + message.content);
+      // console.log(message.author.username + ' - ' + message.author.id + ' - ' + message.channel.id + ' - ' + message.content);
       if (message.channel instanceof Discord.DMChannel) {
         message.channel.startTyping();
         setTimeout(handleDirectMessage, 2000, message);
