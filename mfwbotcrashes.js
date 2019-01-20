@@ -86,7 +86,7 @@ exports.getChannelInfo = function (channelId, isCheck, callback) {
         'nextShallowQuestionToSaveId': 1,
         'isQuestionShallow': false,
         'onBreak': null,
-        'activityInfo': {
+        'activity': {
           'day-off': 0,
           'weekend': 0,
           'long-weekend': 0
