@@ -99,6 +99,12 @@
     }, {
       "activity" : "not leaving the house by order of the Ministry of Health! Well, at least I've got a lot of anime to watch. :P",
       "outcome" : "It was a false alarm. My anime backlog is still five miles long."
+    }, {
+      "activity" : "building a team of misfits and weirdos to pull off the heist of the century! Wish me luck! :D",
+      "outcome" : "The whole \"one last job\" thing didn't work. I guess that's what I told them last time."
+    }, {
+      "activity" : "learning to play chess! It seems so exciting, here we go!",
+      "outcome" : "Turns out, it's a whole lot less glamorous than I thought. And you can't even work out which move to play by looking at the ceiling. At least I can't..."
     }
   ],
   "long-weekend" : [
@@ -111,6 +117,9 @@
     }, {
       "activity" : "working. ;~; That's what you do on labour weekend, right?",
       "outcome" : "Nobody was at work! I just watched anime instead! Hooray! o/"
+    }, {
+      "activity" : "going to a Christmas party at this big tower downtown! I'm kinda tired, so I hope nothing too crazy happens. =/",
+      "outcome" : "I got a lot more than I bargained for. Yippie ki yay!"
     }
   ]
 }
