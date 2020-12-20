@@ -1,0 +1,12 @@
+version: '3.7'
+
+services:
+  client:
+    build: .
+    restart: always
+    env_file: .env
+    volumes:
+      - "db-data:/app"
+
+volumes:
+  db-data:
