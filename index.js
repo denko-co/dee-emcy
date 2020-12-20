@@ -14,15 +14,15 @@ var MAX_MESSAGE_LENGTH = 1800;
 var CRON_TIMING = '0 10,15 * * *';
 var TIMEZONE = 'Pacific/Auckland';
 var HOLIDAY_API = [ // xD
-  '30-03-2018',
-  '02-04-2018', '25-04-2018',
-  '04-06-2018', '22-10-2018', '25-12-2018',
-  '26-12-2018', '01-01-2019',
-  '02-01-2019',
-  '06-02-2019', '19-04-2019',
-  '22-04-2019', '25-04-2019', '03-06-2019',
-  '28-10-2019', '25-12-2019',
-  '26-12-2019'
+  '25-12-2020', '26-12-2020', '28-12-2020',
+  '01-01-2021', '02-01-2021', '04-01-2021',
+  '01-02-2021',
+  '06-02-2021', '08-02-2021',
+  '02-04-2021', '05-04-2021',
+  '25-04-2021', '26-04-2021',
+  '07-06-2021',
+  '25-10-2021',
+  '25-12-2021, '26-12-2021, '27-12-2021', '28-12-2021',
 ];
 
 winston.configure({
@@ -303,7 +303,7 @@ pers.init(function (err) {
 
   bot.on('message', function (message) {
     if (!message.author.bot) {
-      console.log(message.author.username + ' - ' + message.author.id + ' - ' + message.channel.id + ' - ' + message.content);
+      // console.log(message.author.username + ' - ' + message.author.id + ' - ' + message.channel.id + ' - ' + message.content);
       if (message.channel instanceof Discord.DMChannel) {
         message.channel.startTyping();
         setTimeout(handleDirectMessage, 2000, message);
