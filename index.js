@@ -47,7 +47,7 @@ pers.init(function (err) {
     process.exit(1);
   }
   const channelsCron = pers.getAllChannels();
-  for (const channel in channelsCron) {
+  for (let channel in channelsCron) {
     const oldJob = new CronJob({
       cronTime: CRON_TIMING,
       onTick: function () {
@@ -87,7 +87,7 @@ pers.init(function (err) {
         // Backup the db
         fs.createReadStream('./dmcdata.json').pipe(fs.createWriteStream('./' + 'backup_' + version.replace(/ /g, '_') + '.json'));
         // "Upgrade" all channels
-        for (const channel in channels) {
+        for (let channel in channels) {
           if (pers.getVersionText(channels[channel]) !== releaseNote) {
             pers.setVersionText(channels[channel], releaseNote);
             pers.performDataUpgrade(channels[channel], version);
@@ -172,7 +172,7 @@ pers.init(function (err) {
       helpText += tr.helpText1;
       helpText += '\n-----\n' + tr.helpText2;
 
-      for (const ncommandId in nonParamCommands) {
+      for (let ncommandId in nonParamCommands) {
         const ncommand = nonParamCommands[ncommandId];
         const ncommandDetails = nonParamCommandsDetails[ncommandId];
         helpText += '\n**' + ncommand.join(', ') + '** - ' + ncommandDetails.description + ' *For example:* `' + ncommandDetails.usage + '`\n';
@@ -180,7 +180,7 @@ pers.init(function (err) {
 
       helpText += '\n-----\n' + tr.helpText3;
 
-      for (const commandId in paramCommands) {
+      for (let commandId in paramCommands) {
         const command = paramCommands[commandId];
         const commandDetails = paramCommandsDetails[commandId];
         helpText += '\n**' + command.join(', ') + '** - ' + commandDetails.description + ' *For example:* `' + commandDetails.usage + '`\n';
@@ -237,7 +237,7 @@ pers.init(function (err) {
           // Send through to all listening channels as anon. Should take a channel param in future,
           // once we decide how that will work generally for all denko-co apps.
 
-          for (const toSendAnon in channels) {
+          for (let toSendAnon in channels) {
             bot.channels.get(channels[toSendAnon]).send(tr.aS + mainParam.slice(1, -1));
           }
 
@@ -248,7 +248,7 @@ pers.init(function (err) {
           // Handle DMC/SPD
 
           const shallow = modifierParam[0] === 's';
-          for (const channel in channels) {
+          for (let channel in channels) {
             pers.addQuestion(channels[channel], mainParam.slice(1, -1), message.author.id, shallow, function () {});
           }
 
@@ -256,7 +256,7 @@ pers.init(function (err) {
           message.channel.send(tr.questRec + (shallow ? 'SPD' : 'DMC') + tr.questRec2);
 
           // Handle cases where it's going to cause a prompt
-          for (const toCheck in channels) {
+          for (let toCheck in channels) {
             if (!pers.hasDailyQuestion(channels[toCheck]) && pers.getIsShallow(channels[toCheck]) === shallow && pers.getOnBreak(channels[toCheck]) === null) {
               bot.channels.get(channels[channel]).send(tr.aNewQ).then(function (message) {
                 pers.getChannelInfo(channels[channel], true, function (channelInfo) {

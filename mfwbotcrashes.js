@@ -15,7 +15,7 @@ const init = function (callback) {
       callback(err);
     } else {
       const collections = ['questions', 'shallow-questions', 'channelInfo', 'userInfo'];
-      for (const collection in collections) {
+      for (let collection in collections) {
         createCollection(db, collections[collection]);
       }
       db.saveDatabase(function (err) {
