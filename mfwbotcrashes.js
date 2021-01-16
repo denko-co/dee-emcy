@@ -51,7 +51,7 @@ exports.getChannelInfo = function (channelId, isCheck, callback) {
           'long-weekend': 0
         }
       });
-      addQuestion(channelId, tr.aSimpleQ1, '<3', false, function () {
+      addQuestion(channelId, tr.aSimpleQ1, 0, false, function () {
         db.saveDatabase(function (err) {
           if (err) {
             callback(err);
