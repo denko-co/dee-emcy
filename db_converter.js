@@ -58,8 +58,8 @@ class DatabaseConverter {
 				newDb.serialize(() => {
 					const flattenedColumns = newColumns.map(v => v.join(' '));
 					const columnString = flattenedColumns.join(', ');
-					newDb.run(`CREATE TABLE "${name}" (${columnString});`);
-					winston.info(`CREATE TABLE "${name}" (${columnString});`);
+					newDb.run(`CREATE TABLE IF NOT EXISTS "${name}" (${columnString});`);
+					winston.info(`CREATE TABLE IF NOT EXISTS "${name}" (${columnString});`);
 
 					// Insert all the old data into the newly constructed table.
 					// Comma-separated column names.
@@ -142,6 +142,3 @@ class DatabaseConverter {
 		});
 	}
 }
- 
-let converter = new DatabaseConverter('./dmcdata.json', './dmcdata.db');
-converter.run();
