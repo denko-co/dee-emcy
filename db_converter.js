@@ -1,6 +1,7 @@
-const sqlite3 = require('sqlite3'); 
+const sqlite3 = require('sqlite3').verbose(); 
 const loki = require('lokijs');
 const winston = require('winston');
+const db = require('./db.js');
 
 // To run: node db_converter.js
 // This file automatically converts a LokiJS JSON database into a sqlite3 database.
@@ -22,9 +23,8 @@ class DatabaseConverter {
 	run() {
 		let oldDb = this.oldDb;
 		let newDb = this.newDb;
-		let self = this;
 		// Load the old database (with Loki).
-		oldDb.loadDatabase({}, function (err) {
+		oldDb.loadDatabase({}, (err) => {
 			if (err) {
 				winston.info(err);
 				return;
@@ -33,29 +33,27 @@ class DatabaseConverter {
 			// Collections are the tables.
 			// Get all the names of the tables.
 			const collections = oldDb.listCollections().map(v => v.name);
-			newDb.run('BEGIN EXCLUSIVE TRANSACTION;');
-			for (let name of collections) {
-				let collection = oldDb.getCollection(name);
-				let data = collection.find();
-				if (!data) {
-					continue;
-				}
+			newDb.serialize(() => {
+				newDb.run('BEGIN EXCLUSIVE TRANSACTION;');
+				for (let name of collections) {
+					let collection = oldDb.getCollection(name);
+					let data = collection.find();
+					if (!data) {
+						continue;
+					}
 
-				// Assume the last item is representative and complete.
-				const representativeItem = data[data.length - 1];
-				// Holds all the new columns, expected entries are tuples of column name and data type.
-				let newColumns = [];
+					// Assume the last item is representative and complete.
+					const representativeItem = data[data.length - 1];
+					// Holds all the new columns, expected entries are tuples of column name and data type.
+					let newColumns = [];
 
-				// (Attempt to) infer the database schema automatically.
-				for (let [key, value] of Object.entries(representativeItem)) {
-					// Find the data type.
-					newColumns = self.getColumnDetails(key, value, newColumns);
-				}
+					// (Attempt to) infer the database schema automatically.
+					for (let [key, value] of Object.entries(representativeItem)) {
+						// Find the data type.
+						newColumns = this.getColumnDetails(key, value, newColumns);
+					}
 
-				winston.info(newColumns);
-
-				// Create the table.
-				newDb.serialize(() => {
+					// Create the table.
 					const flattenedColumns = newColumns.map(v => v.join(' '));
 					const columnString = flattenedColumns.join(', ');
 					newDb.run(`CREATE TABLE IF NOT EXISTS "${name}" (${columnString});`);
@@ -65,19 +63,28 @@ class DatabaseConverter {
 					// Comma-separated column names.
 					const columnNamesString = newColumns.map(v => v[0]).join(', ');
 					for (let item of data) {
-						const flattenedItem = self.flattenObj(item);
-						const dataString = self.quote(Object.values(flattenedItem)).join(', ');
+						const flattenedItem = this.flattenObj(item);
+						// Only keep data for the new columnns.
+						const filtered = Object.entries(flattenedItem).filter((val) => {
+							let colName = this.protect(val[0]);
+							let newColumnNames = newColumns.map(v => v[0]);
+							return newColumnNames.includes(colName);
+						})
+						const mapped = filtered.map(val => val[1]);
+						const dataString = this.quote(mapped).join(', ');
 						const insertionString = `INSERT INTO "${name}" (${columnNamesString}) VALUES (${dataString})`;
-						winston.info(`INSERT INTO "${name}" (${columnNamesString}) VALUES (${dataString})`);
+						newDb.run(insertionString);
+						winston.info(insertionString);
 					}
-				});
-			}
+				}
 
-			// Attempt to commit everything.
-			// We can't use a try/catch because sqlite3 errors are not thrown by this command.
-			// However, all previous changes will only be permanent if this succeeds. Therefore
-			// no changes will be saved unless all changes are able to saved.
-			newDb.run('COMMIT TRANSACTION;');
+				// Attempt to commit everything.
+				// We can't use a try/catch because sqlite3 errors are not thrown by this command.
+				// However, all previous changes will only be permanent if this succeeds. Therefore
+				// no changes will be saved unless all changes are able to saved.
+				newDb.run('COMMIT TRANSACTION;');
+				winston.info('COMMIT TRANSACTION;');
+			});
 		});
 
 	}
@@ -85,7 +92,13 @@ class DatabaseConverter {
 	// To protect against names with hyphens.
 	// Double quotes around column names, single quotes around strings.
 	protect(k) {
-		return '"' + k + '"';
+		if (typeof k === 'string') {
+			return '"' + k + '"';
+		} else if (k === null) {
+			return "null";
+		} else {
+			return k;
+		}
 	}
 
 	// Recursively determines the column type and adds the column schema to 
@@ -126,7 +139,7 @@ class DatabaseConverter {
 	flattenObj(obj, parent, res = {}){
 		for(let key in obj){
 		    let propName = parent ? parent + '_' + key : key;
-		    if(typeof obj[key] == 'object'){
+		    if(typeof obj[key] == 'object' && obj[key] !== null){
 		        this.flattenObj(obj[key], propName, res);
 		    } else {
 		        res[propName] = obj[key];
@@ -138,7 +151,12 @@ class DatabaseConverter {
 	// Wraps each item in the array in quotes if it is a string.
 	quote(arr) {
 		return arr.map((v) => {
-			return typeof v === 'string' ? this.protect(v) : v;
+			return this.protect(v);
 		});
 	}
 }
+
+exports.DatabaseConverter = DatabaseConverter;
+
+const converter = new DatabaseConverter('./dmcdata.json', './dmcdata.db');
+converter.run();

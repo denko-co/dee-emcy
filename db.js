@@ -20,7 +20,13 @@ class SqliteDatabase {
 	* @return {string|number} Double-quoted string or the original number.
 	*/
 	quote(k) {
-		return typeof k === 'string' ?  '"' + k + '"' : k;
+		if (typeof k === 'string') {
+			return '"' + k + '"';
+		} else if (k === null) {
+			return "null";
+		} else {
+			return k;
+		}
 	}
 
 	/**
@@ -31,7 +37,7 @@ class SqliteDatabase {
 	*/
 	quoteAll(arr) {
 		return arr.map((v) => {
-			return typeof v === 'string' ? this.quote(v) : v;
+			return this.quote(v);
 		});
 	}
 
@@ -82,7 +88,7 @@ class SqliteDatabase {
 	flattenObj(obj, parent, res = {}){
 		for(let key in obj){
 		    let propName = parent ? parent + '_' + key : key;
-		    if(typeof obj[key] == 'object'){
+		    if(typeof obj[key] == 'object' && obj[key] !== null){
 		        this.flattenObj(obj[key], propName, res);
 		    } else {
 		        res[propName] = obj[key];
@@ -103,7 +109,7 @@ class SqliteDatabase {
 	* @return {string} Joined string.
 	*/
 	buildKeyValueString(params, joiner = ' AND ', kvJoiner = '=') {
-		const flattenedItem = this.flattenObj(item);
+		const flattenedItem = this.flattenObj(params);
 		const paramString = Object.entries(flattenedItem).map(([k, v]) => quote(k) + kvJoiner + quote(v));
 		return paramString.join(joiner);
 	}
@@ -131,7 +137,7 @@ class SqliteDatabase {
 	* @return {string} The select query string.
 	*/
 	buildSelectQuery(table, params) {
-		const whereString = buildKeyValueString(params);
+		const whereString = this.buildKeyValueString(params);
 		if (whereString) {
 			return `SELECT * FROM "${table}" WHERE ${whereString};`;
 		} else {
@@ -149,9 +155,9 @@ class SqliteDatabase {
 	*/
 	buildUpdateQuery(table, valueParams, whereParams = {}) {
 		const flattenedValues = this.flattenObj(valueParams);
-		const whereParams = this.flattenObj(whereParams);
-		const valueString = buildKeyValueString(params, ', ');
-		const whereString = buildKeyValueString(params);
+		const flattenedWhere = this.flattenObj(whereParams);
+		const valueString = buildKeyValueString(flattenedValues, ', ');
+		const whereString = buildKeyValueString(flattenedWhere);
 		if (whereString) {
 			return `UPDATE "${table}" SET ${valueString} WHERE ${whereString};`;
 		} else {
@@ -168,6 +174,7 @@ class SqliteDatabase {
 		// Serialize queries to ensure commits are finished before closing.
 		return this.db.serialize(() => {
 			this.db.run(query, params, (err) => {
+				winston.info('INSERT:', query);
 				if (err) {
 					winston.info(err.message);
 					return err;
@@ -185,7 +192,8 @@ class SqliteDatabase {
 	*/
 	find(table, params = {}) {
 		const query = this.buildSelectQuery(table, params);
-		return this.db.all(query, params, (err, rows) => {
+		this.db.all(query, params, (err, rows) => {
+			winston.info('FIND:', query);
 			if (err) {
 				winston.info(err.message);
 				return err;
@@ -203,6 +211,7 @@ class SqliteDatabase {
 	findOne(table, params = {}) {
 		const query = this.buildSelectQuery(table, params);
 		return this.db.get(query, params, (err, row) => {
+			winston.info('FINDONE:', query);
 			if (err) {
 				winston.info(err.message);
 				return err;
@@ -220,6 +229,7 @@ class SqliteDatabase {
 	update(table, valueParams, whereParams = {}) {
 		const query = this.buildUpdateQuery(table, valueParams, whereParams);
 		return this.db.serialize(() => {
+			winston.info('UPDATE:', query);
 			return this.db.run(query, params, (err) => {
 				if (err) {
 					winston.info(err.message);
@@ -242,6 +252,7 @@ class SqliteDatabase {
 			this.db.run('BEGIN EXCLUSIVE TRANSACTION;');
 			for (query of queries) {
 				this.db.run(query, null, (err) => {
+					winston.info('QUERY:', query);
 					if (err) {
 						winston.info(err.message);
 						return err;
@@ -252,3 +263,5 @@ class SqliteDatabase {
 		});
 	}
 }
+
+exports.SqliteDatabase = SqliteDatabase;
