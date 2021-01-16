@@ -158,5 +158,5 @@ class DatabaseConverter {
 
 exports.DatabaseConverter = DatabaseConverter;
 
-const converter = new DatabaseConverter('./dmcdata.json', './dmcdata.db');
-converter.run();
+// const converter = new DatabaseConverter('./dmcdata.json', './dmcdata.db');
+// converter.run();

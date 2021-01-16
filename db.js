@@ -1,14 +1,30 @@
-const sqlite3 = require('sqlite3');
+// We want to run commands synchronously for simplicity but base sqlite3
+// is all asynchronous. We can't use async/await because the node-sqlite3 
+// library does not support the Promise API. So we use better-sqlite3
+// instead for synchronous calls.
+const sqlite3 = require('better-sqlite3');
 const winston = require('winston');
 
 class SqliteDatabase {
 	constructor(filename, schema = null) {
 		this.filename = filename;
-		this.db = new sqlite3.Database(filename);
+		this.db = new sqlite3(filename);
 
 		if (schema !== null) {
 			this.initTables(schema);
 		}
+	}
+
+	/**
+	* Creates a database connection which supports Promises.
+	* @param {string} filename The filename for the database.
+	* @return {Promise} A promise which resolves to a database connection.
+	*/
+	createDbConnection(filename) {
+	    return open({
+	        filename,
+	        'driver': sqlite3.Database
+	    });
 	}
 
 	/**
@@ -54,26 +70,24 @@ class SqliteDatabase {
 	* @param {!Array<!Object>} schema
 	*/
 	initTables(schema) {
-		this.db.run('BEGIN EXCLUSIVE TRANSACTION;');
+		//this.db.run('BEGIN EXCLUSIVE TRANSACTION;');
 		for (let table of schema) {
 			const name = table.tableName;
 			// Create the table.
-			this.db.serialize(() => {
-				// Wrap the column name in quotes and join together.
-				const flattenedColumns = table.columns.map((v) => {
-					v[0] = this.quote(v[0]);
-					return v.join(' ');
-				});
-				const columnString = flattenedColumns.join(', ');
-				this.db.run(`CREATE TABLE IF NOT EXISTS "${name}" (${columnString});`);
-				winston.info(`CREATE TABLE IF NOT EXISTS "${name}" (${columnString});`);
+			// Wrap the column name in quotes and join together.
+			const flattenedColumns = table.columns.map((v) => {
+				v[0] = this.quote(v[0]);
+				return v.join(' ');
 			});
+			const columnString = flattenedColumns.join(', ');
+			this.db.prepare(`CREATE TABLE IF NOT EXISTS "${name}" (${columnString});`).run();
+			winston.info(`CREATE TABLE IF NOT EXISTS "${name}" (${columnString});`);
 		}
 		// Attempt to commit everything.
 		// We can't use a try/catch because sqlite3 errors are not thrown by this command.
 		// However, all previous changes will only be permanent if this succeeds. Therefore
 		// no changes will be saved unless all changes are able to saved.
-		this.db.run('COMMIT TRANSACTION;');
+		//this.db.run('COMMIT TRANSACTION;');
 	}
 
 	/**
@@ -171,17 +185,15 @@ class SqliteDatabase {
 	*/
 	insert(table, params = {}) {
 		const query = this.buildInsertQuery(table, params);
-		// Serialize queries to ensure commits are finished before closing.
-		return this.db.serialize(() => {
-			this.db.run(query, params, (err) => {
-				winston.info('INSERT:', query);
-				if (err) {
-					winston.info(err.message);
-					return err;
-				}
-			});
-			this.db.run('COMMIT TRANSACTION;');
-		});
+		winston.info('INSERT:', query);
+
+		// Ensure commits are finished before closing.
+		this.db.prepare('BEGIN TRANSACTION;').run();
+		const info = this.db.prepare(query).run();
+		this.db.prepare('COMMIT TRANSACTION;').run();
+
+		winston.info(info);
+		return info;
 	}
 
 	/**
@@ -192,14 +204,8 @@ class SqliteDatabase {
 	*/
 	find(table, params = {}) {
 		const query = this.buildSelectQuery(table, params);
-		this.db.all(query, params, (err, rows) => {
-			winston.info('FIND:', query);
-			if (err) {
-				winston.info(err.message);
-				return err;
-			}
-			return rows;
-		});
+		winston.info('FIND:', query);
+		return this.db.prepare(query).all();
 	}
 
 	/**
@@ -210,14 +216,8 @@ class SqliteDatabase {
 	*/
 	findOne(table, params = {}) {
 		const query = this.buildSelectQuery(table, params);
-		return this.db.get(query, params, (err, row) => {
-			winston.info('FINDONE:', query);
-			if (err) {
-				winston.info(err.message);
-				return err;
-			}
-			return row;
-		});
+		winston.info('FINDONE:', query);
+		return this.db.prepare(query).get();
 	}
 
 	/**
@@ -228,16 +228,14 @@ class SqliteDatabase {
 	*/
 	update(table, valueParams, whereParams = {}) {
 		const query = this.buildUpdateQuery(table, valueParams, whereParams);
-		return this.db.serialize(() => {
-			winston.info('UPDATE:', query);
-			return this.db.run(query, params, (err) => {
-				if (err) {
-					winston.info(err.message);
-					return err;
-				}
-			});
-			this.db.run('COMMIT TRANSACTION;');
-		});
+		winston.info('UPDATE:', query);
+
+		this.db.prepare('BEGIN TRANSACTION;').run();
+		const info = this.db.prepare(query).run();
+		this.db.run('COMMIT TRANSACTION;');
+
+		winston.info(info);
+		return info;
 	}
 
 	/**
@@ -247,20 +245,14 @@ class SqliteDatabase {
 	* @return {Promise} A promise that resolves into an error if there exists an error.
 	*/
 	atomicQuery(queries) {
-		// Serialize queries to ensure each query is run atomically and in sequence.
-		return this.db.serialize(() => {
-			this.db.run('BEGIN EXCLUSIVE TRANSACTION;');
-			for (query of queries) {
-				this.db.run(query, null, (err) => {
-					winston.info('QUERY:', query);
-					if (err) {
-						winston.info(err.message);
-						return err;
-					}
-				});
-			}
-			this.db.run('COMMIT TRANSACTION;');
-		});
+		// Eensure each query is run atomically and in sequence.
+		this.db.prepare('BEGIN EXCLUSIVE TRANSACTION;').run();
+		for (query of queries) {
+			winston.info('QUERY:', query);
+			const info = this.db.prepare(query).run();
+			winston.info(info);
+		}
+		this.db.prepare('COMMIT TRANSACTION;').run();
 	}
 }
 
