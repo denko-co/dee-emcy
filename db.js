@@ -11,13 +11,24 @@ class SqliteDatabase {
 		}
 	}
 
-	// To protect against names with hyphens.
-	// Double quotes around column names, single quotes around strings is conventional.
+	/**
+	* To protect against names/values with hyphens.
+	* Conventionally, in SQLite there should be double quotes around column names
+	* and single quotes around strings, but double quotes work for both.
+	* 
+	* @param {string|number} k The name to protect.
+	* @return {string|number} Double-quoted string or the original number.
+	*/
 	quote(k) {
 		return typeof k === 'string' ?  '"' + k + '"' : k;
 	}
 
-	// Wraps each item in the array in quotes if it is a string.
+	/**
+	* Wraps each item in the array in quotes if it is a string.
+	* 
+	* @param {!Array<string|number>} arr An array of values to protect.
+	* @param {!Array<string|number>} Array of quoted strings or the original items.
+	*/
 	quoteAll(arr) {
 		return arr.map((v) => {
 			return typeof v === 'string' ? this.quote(v) : v;
@@ -25,6 +36,7 @@ class SqliteDatabase {
 	}
 
 	/**
+	* Initializes the database tables according to the given schema.
 	* Expected schema is an array of objects, with a tableName property and 
 	* a columns property, which is an array of tuples of column name and data type.
 	* e.g.
@@ -32,11 +44,12 @@ class SqliteDatabase {
 	*    tableName: 'questions',
 	*    columns: [['author', 'NUMERIC'], ['questionText', 'TEXT']]
 	* }]
+	* 
+	* @param {!Array<!Object>} schema
 	*/
 	initTables(schema) {
 		this.db.run('BEGIN EXCLUSIVE TRANSACTION;');
 		for (let table of schema) {
-
 			const name = table.tableName;
 			// Create the table.
 			this.db.serialize(() => {
@@ -57,7 +70,15 @@ class SqliteDatabase {
 		this.db.run('COMMIT TRANSACTION;');
 	}
 
-	// https://stackoverflow.com/questions/44134212/best-way-to-flatten-js-object-keys-and-values-to-a-single-depth-array
+	/**
+	* Flattens an object.
+	* https://stackoverflow.com/questions/44134212/best-way-to-flatten-js-object-keys-and-values-to-a-single-depth-array
+	*
+	* @param {!Object} obj The object to flatten (recursively).
+	* @param {string} parent Name of the parent of the object.
+	* @param {?Object} res Intermediate result.
+	* @return {!Object} The flattened object.
+	*/
 	flattenObj(obj, parent, res = {}){
 		for(let key in obj){
 		    let propName = parent ? parent + '_' + key : key;
@@ -70,12 +91,30 @@ class SqliteDatabase {
 		return res;
 	}
 
-	buildKeyValueString(params, joiner = ' AND ') {
+	/**
+	* Constructs a string out of an object, flattening it to a sequence of
+	* key-value pairs.
+	* e.g. {'name': 'John', 'age': 20} =>
+	* 'name = John AND age = 20'
+	*
+	* @param {!Object} params The object to flatten into a string.
+	* @param {string} joiner Joiner between key-value pairs.
+	* @param {string} kvJoiner Joiner inside key-value pairs.
+	* @return {string} Joined string.
+	*/
+	buildKeyValueString(params, joiner = ' AND ', kvJoiner = '=') {
 		const flattenedItem = this.flattenObj(item);
-		const paramString = Object.entries(flattenedItem).map(([k, v]) => quote(k) + '=' + quote(v));
+		const paramString = Object.entries(flattenedItem).map(([k, v]) => quote(k) + kvJoiner + quote(v));
 		return paramString.join(joiner);
 	}
 
+	/**
+	* Builds an insertion query.
+	*
+	* @param {!string} table The name of the table to insert into.
+	* @param {?Object} params A dictionary of column names to values to use as parameters.
+	* @return {string} The insertion query string.
+	*/
 	buildInsertQuery(table, params) {
 		const flattenedItem = this.flattenObj(params);
 		const columnNamesString = this.quoteAll(Object.keys(flattenedItem)).join(', ');
@@ -84,6 +123,13 @@ class SqliteDatabase {
 		return insertionString;
 	}
 
+	/**
+	* Builds a select query.
+	*
+	* @param {!string} table The name of the table to select.
+	* @param {?Object} params A dictionary of column names to values to use as parameters.
+	* @return {string} The select query string.
+	*/
 	buildSelectQuery(table, params) {
 		const whereString = buildKeyValueString(params);
 		if (whereString) {
@@ -94,6 +140,8 @@ class SqliteDatabase {
 	}
 
 	/**
+	* Builds an update query.
+	*
 	* @param {!string} table The name of the table to update.
 	* @param {?Object} valueParams A dictionary of column names to values to update.
 	* @param {?Object} whereParams A dictionary of column names to values to find items.
@@ -125,13 +173,8 @@ class SqliteDatabase {
 					return err;
 				}
 			});
+			this.db.run('COMMIT TRANSACTION;');
 		});
-		// this.db.close((err) => {
-		// 	if (err) {
-		// 		winston.info(err.message);
-		// 		return err;
-		// 	}
-		// });
 	}
 
 	/**
@@ -167,7 +210,7 @@ class SqliteDatabase {
 			return row;
 		});
 	}
-	
+
 	/**
 	* @param {!string} table The name of the table to update.
 	* @param {?Object} valueParams A dictionary of column names to values to update.
@@ -176,11 +219,14 @@ class SqliteDatabase {
 	*/
 	update(table, valueParams, whereParams = {}) {
 		const query = this.buildUpdateQuery(table, valueParams, whereParams);
-		return this.db.get(query, params, (err) => {
-			if (err) {
-				winston.info(err.message);
-				return err;
-			}
+		return this.db.serialize(() => {
+			return this.db.run(query, params, (err) => {
+				if (err) {
+					winston.info(err.message);
+					return err;
+				}
+			});
+			this.db.run('COMMIT TRANSACTION;');
 		});
 	}
 
