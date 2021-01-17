@@ -3,7 +3,9 @@ const loki = require('lokijs');
 const winston = require('winston');
 const db = require('./db.js');
 
-// To run: node db_converter.js
+// To run:
+// const converter = new DatabaseConverter('./dmcdata.json', './dmcdata.db');
+// converter.run();
 // This file automatically converts a LokiJS JSON database into a sqlite3 database.
 
 /**
@@ -157,6 +159,3 @@ class DatabaseConverter {
 }
 
 exports.DatabaseConverter = DatabaseConverter;
-
-// const converter = new DatabaseConverter('./dmcdata.json', './dmcdata.db');
-// converter.run();

@@ -98,7 +98,7 @@ class SqliteDatabase {
 	* @param {!Array<!Object>} schema
 	*/
 	initTables(schema) {
-		//this.db.run('BEGIN EXCLUSIVE TRANSACTION;');
+		this.db.prepare('BEGIN EXCLUSIVE TRANSACTION;').run();
 		for (let table of schema) {
 			const name = table.tableName;
 			// Create the table.
@@ -115,7 +115,7 @@ class SqliteDatabase {
 		// We can't use a try/catch because sqlite3 errors are not thrown by this command.
 		// However, all previous changes will only be permanent if this succeeds. Therefore
 		// no changes will be saved unless all changes are able to saved.
-		//this.db.run('COMMIT TRANSACTION;');
+		this.db.prepare('COMMIT TRANSACTION;').run();
 	}
 
 	/**
