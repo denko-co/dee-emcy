@@ -104,6 +104,7 @@ pers.init(function (err) {
     const message = messageReaction.message;
     const channelId = message.channel.id;
     pers.getChannelInfo(channelId, true, function (channelInfo) {
+      // channelInfo = channelInfo.map(v => unescape(v) if typeof(v) === 'string');
       if (channelInfo !== null) {
         if (message.author.id === bot.user.id && pers.getQuestionMessageId(channelId) === message.id) {
           let diff = message.reactions.reduce(function (val, curr) {
@@ -364,7 +365,7 @@ pers.init(function (err) {
         winston.info('CronJob created for new channel ' + channel.id);
       }
       if (channelInfo.questionOfTheDay !== null) {
-        channel.fetchMessage(channelInfo.questionOfTheDay).then(function (message) {
+        channel.fetchMessage(channelInfo.questionOfTheDay).then((message) => {
           if (message.pinned) {
             message.unpin();
           }

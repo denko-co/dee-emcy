@@ -9,8 +9,6 @@ const channelInfoTableName = 'channelInfo';
 let initialised = false;
 let db;
 
-// TODO: Remove dependence on questionId (for both shallow and deep question tables).
-
 const init = function (callback) {
   if (initialised) {
     return;
@@ -31,8 +29,9 @@ exports.performDataUpgrade = function (oldDbName, newDbName) {
   winston.info(`Migrated database from ${oldDbName} to ${newDbName}.`);
 };
 
-exports.getChannelInfo = async function (channelId, isCheck, callback) {
-  const thisChannelInfo = await db.findOne(channelInfoTableName, {'channel': channelId});
+exports.getChannelInfo =  function (channelId, isCheck, callback) {
+  const thisChannelInfo =  db.findOne(channelInfoTableName, {'channel': channelId});
+  // const thisChannelInfo = thisChannelInfo.map(v => unescape(v) if typeof(v) === 'string');
   if (!thisChannelInfo) {
     if (isCheck) {
       callback(null);
@@ -55,15 +54,13 @@ exports.getChannelInfo = async function (channelId, isCheck, callback) {
           'long-weekend': 0
         }
       });
-      addQuestion(channelId, tr.aSimpleQ1, 0, false, function () {
-        db.saveDatabase(function (err) {
-          if (err) {
-            callback(err);
-          } else {
-            winston.info('Channel created successfully!');
-            callback(newChannel, true);
-          }
-        });
+      addQuestion(channelId, tr.aSimpleQ1, 0, false, (info) => {
+        if (info && info.changes && info.changes == 1) {
+          winston.info('Channel created successfully!');
+          callback(newChannel, true);
+        } else {
+          callback(info);
+        }
       });
     }
   } else {
@@ -74,28 +71,29 @@ exports.getChannelInfo = async function (channelId, isCheck, callback) {
 // TODO: Remove dependence on questionId (for both shallow and deep question tables).
 // Currently, this relies on no questions being saved at the same time, to return correctly.
 // Instead, this really should be using autoincrement.
-const manuallyIncrement = async function(channelId, field) {
-  const thisChannelInfo = await db.findOne(channelInfoTableName, {'channel': channelId});
+const manuallyIncrement =  function(channelId, field) {
+  const thisChannelInfo =  db.findOne(channelInfoTableName, {'channel': channelId});
   const questionId = thisChannelInfo[field];
   const newQuestionId = questionId + 1;
 
   const valueParam = {};
-  valueParam[field] = value;
+  valueParam[field] = newQuestionId;
   db.update(channelInfoTableName, valueParam, {'channel': channelId});
   return questionId;
 }
 
-const addQuestion = async function (channelId, question, author, shallow, callback) {
+const addQuestion =  function (channelId, question, author, shallow, callback) {
   const questionTableName = shallow ? 'shallow-questions' : 'questions';
   const field = shallow ? 'nextShallowQuestionToSaveId' : 'nextQuestionToSaveId';
-  const questionId = await manuallyIncrement(channelId, field);
-  let err = await db.insert(questionTableName, {
+  const questionId =  manuallyIncrement(channelId, field);
+  let err = db.insert(questionTableName, {
     'channel': channelId,
     'question': question,
     'author': author,
     'questionId': questionId
   });
   if (err) {
+    console.log(err)
     callback(err);
   } else {
     winston.info('Question saved successfully!');
@@ -105,9 +103,9 @@ const addQuestion = async function (channelId, question, author, shallow, callba
 
 exports.addQuestion = addQuestion;
 
-exports.getNextQuestion = async function (channelId, check, callback, shouldFlip) {
+exports.getNextQuestion =  function (channelId, check, callback, shouldFlip) {
   winston.info('Getting question for ' + channelId + ', with check as ' + check + ' and shouldFlip as ' + shouldFlip);
-  const thisChannelInfo = await db.findOne('channelInfo', {'channel': channelId});
+  const thisChannelInfo =  db.findOne('channelInfo', {'channel': channelId});
   const shallow = shouldFlip ? !thisChannelInfo.isQuestionShallow : thisChannelInfo.isQuestionShallow;
   const field = shallow ? 'nextShallowQuestionToPostId' : 'nextQuestionToPostId';
   const questionId = thisChannelInfo[field];
@@ -119,7 +117,7 @@ exports.getNextQuestion = async function (channelId, check, callback, shouldFlip
   }
   if (question) {
     if (!check) {
-      await manuallyIncrement(channelId, field);
+       manuallyIncrement(channelId, field);
     }
     callback(question, shallow, hasNext);
   } else {
@@ -131,8 +129,8 @@ exports.getQuestionMessageId = function (channelId) {
   return db.findOne(channelInfoTableName, {'channel': channelId}).questionOfTheDay;
 };
 
-exports.setQuestionMessageId = async function (channelId, messageId, callback) {
-  const err = await db.update(channelInfoTableName, {'questionOfTheDay': messageId}, {'channel': channelId}); 
+exports.setQuestionMessageId =  function (channelId, messageId, callback) {
+  const err =  db.update(channelInfoTableName, {'questionOfTheDay': messageId}, {'channel': channelId}); 
   if (err) {
     callback(err);
   } else {
@@ -141,13 +139,13 @@ exports.setQuestionMessageId = async function (channelId, messageId, callback) {
   }
 };
 
-exports.getUserInfo = async function (userId, callback) {
+exports.getUserInfo =  function (userId, callback) {
   const userTableName = 'userInfo';
-  const user = users.findOne(userTableName, {'user': userId});
+  const user = db.findOne(userTableName, {'user': userId});
   if (user) {
     callback(user, true);
   } else {
-    const err = await db.insert(userTableName, {
+    const err =  db.insert(userTableName, {
       'user': userId,
       'knowsSecret': false
     });
@@ -155,8 +153,8 @@ exports.getUserInfo = async function (userId, callback) {
   }
 };
 
-exports.getAllChannels = async function () {
-  const dataOrErr = await db.find(channelInfoTableName);
+exports.getAllChannels =  function () {
+  const dataOrErr =  db.find(channelInfoTableName);
   if (!dataOrErr) {
     winston.error(dataOrErr);
     return dataOrErr;
@@ -190,8 +188,8 @@ exports.getIsShallow = function (channelId) {
   return db.findOne(channelInfoTableName, {'channel': channelId}).isQuestionShallow;
 };
 
-const flipShallow = async function (channelId) {
-  const shallow = await db.findOne(channelInfoTableName, {'channel': channelId}).isQuestionShallow;
+const flipShallow =  function (channelId) {
+  const shallow =  db.findOne(channelInfoTableName, {'channel': channelId}).isQuestionShallow;
   db.update(channelInfoTableName, {'isQuestionShallow': shallow}, {'channel': channelId});
 };
 

@@ -30,30 +30,58 @@ class SqliteDatabase {
 	/**
 	* To protect against names/values with hyphens.
 	* Conventionally, in SQLite there should be double quotes around column names
-	* and single quotes around strings, but double quotes work for both.
+	* and single quotes around strings.
 	* 
 	* @param {string|number} k The name to protect.
+	* @param {!boolean} isColumn Whether to use double quotes or single.
 	* @return {string|number} Double-quoted string or the original number.
 	*/
-	quote(k) {
+	quote(k, isColumn = true) {
+		const quotes = isColumn ? '"' : '';
 		if (typeof k === 'string') {
-			return '"' + k + '"';
+			k = isColumn ? k : escape(k);
+			return quotes + k + quotes;
 		} else if (k === null) {
 			return "null";
+		} else if (k === true) {
+			// better-sqlite3 disallows true/false as booleans.
+			return 1;
+		} else if (k === false) {
+			return 0;
 		} else {
 			return k;
 		}
+	}
+
+
+	/**
+	* Unescapes all values in an object.
+	*
+	* @param {!Object} obj The object to unescape.
+	* @return{!Object} The unescaped object.
+	*/
+	dequoteAll(obj) {
+		if (!obj) {
+			return obj;
+		}
+		return Object.fromEntries(Object.entries(obj).map(([k, v]) => {
+			if (typeof v === 'string') {
+				v = unescape(v);
+			}
+			return [k, v];
+		}));
 	}
 
 	/**
 	* Wraps each item in the array in quotes if it is a string.
 	* 
 	* @param {!Array<string|number>} arr An array of values to protect.
-	* @param {!Array<string|number>} Array of quoted strings or the original items.
+	* @param {!boolean} isColumn Whether to use double quotes or single.
+	* @return {!Array<string|number>} Array of quoted strings or the original items.
 	*/
-	quoteAll(arr) {
+	quoteAll(arr, isColumn = true) {
 		return arr.map((v) => {
-			return this.quote(v);
+			return this.quote(v, isColumn);
 		});
 	}
 
@@ -124,7 +152,25 @@ class SqliteDatabase {
 	*/
 	buildKeyValueString(params, joiner = ' AND ', kvJoiner = '=') {
 		const flattenedItem = this.flattenObj(params);
-		const paramString = Object.entries(flattenedItem).map(([k, v]) => quote(k) + kvJoiner + quote(v));
+		// We're aiming to parametize this.
+		const paramString = Object.entries(flattenedItem).map(([k, v]) => this.quote(k) + kvJoiner + this.quote(v, false));
+		return paramString.join(joiner);
+	}
+
+	/**
+	* Constructs a string out of an object for parameter entry.
+	* e.g. {'name': 'John', 'age': 20} =>
+	* 'name = @name AND age = @age'
+	*
+	* @param {!Object} params The object to flatten into a string.
+	* @param {string} joiner Joiner between key-value pairs.
+	* @param {string} kvJoiner Joiner inside key-value pairs.
+	* @return {string} Joined string.
+	*/
+	buildParamString(params, joiner = ' AND ', kvJoiner = ' = ?') {
+		const flattenedItem = this.flattenObj(params);
+		// We're aiming to parametize this.
+		const paramString = Object.entries(flattenedItem).map(([k, v]) => this.quote(k) + kvJoiner );
 		return paramString.join(joiner);
 	}
 
@@ -138,7 +184,7 @@ class SqliteDatabase {
 	buildInsertQuery(table, params) {
 		const flattenedItem = this.flattenObj(params);
 		const columnNamesString = this.quoteAll(Object.keys(flattenedItem)).join(', ');
-		const dataString = this.quoteAll(Object.values(flattenedItem)).join(', ');
+		const dataString = Object.keys(flattenedItem).map(k => '?').join(', '); // this.quoteAll(Object.values(flattenedItem), false).join(', ');
 		const insertionString = `INSERT INTO "${table}" (${columnNamesString}) VALUES (${dataString});`;
 		return insertionString;
 	}
@@ -151,7 +197,7 @@ class SqliteDatabase {
 	* @return {string} The select query string.
 	*/
 	buildSelectQuery(table, params) {
-		const whereString = this.buildKeyValueString(params);
+		const whereString = this.buildParamString(params);
 		if (whereString) {
 			return `SELECT * FROM "${table}" WHERE ${whereString};`;
 		} else {
@@ -170,8 +216,8 @@ class SqliteDatabase {
 	buildUpdateQuery(table, valueParams, whereParams = {}) {
 		const flattenedValues = this.flattenObj(valueParams);
 		const flattenedWhere = this.flattenObj(whereParams);
-		const valueString = buildKeyValueString(flattenedValues, ', ');
-		const whereString = buildKeyValueString(flattenedWhere);
+		const valueString = this.buildParamString(flattenedValues, ', ');
+		const whereString = this.buildParamString(flattenedWhere);
 		if (whereString) {
 			return `UPDATE "${table}" SET ${valueString} WHERE ${whereString};`;
 		} else {
@@ -185,11 +231,13 @@ class SqliteDatabase {
 	*/
 	insert(table, params = {}) {
 		const query = this.buildInsertQuery(table, params);
-		winston.info('INSERT:', query);
+		const prepared = this.db.prepare(query);
+		winston.info('INSERT:', prepared);
+		const values = this.quoteAll(Object.values(this.flattenObj(params)), false);
 
 		// Ensure commits are finished before closing.
 		this.db.prepare('BEGIN TRANSACTION;').run();
-		const info = this.db.prepare(query).run();
+		const info = prepared.run(...values);
 		this.db.prepare('COMMIT TRANSACTION;').run();
 
 		winston.info(info);
@@ -204,8 +252,10 @@ class SqliteDatabase {
 	*/
 	find(table, params = {}) {
 		const query = this.buildSelectQuery(table, params);
-		winston.info('FIND:', query);
-		return this.db.prepare(query).all();
+		const prepared = this.db.prepare(query);
+		winston.info('FIND:', prepared);
+		const values = this.quoteAll(Object.values(this.flattenObj(params)), false);
+		return prepared.all(...values).map(row => this.dequoteAll(row));
 	}
 
 	/**
@@ -216,8 +266,10 @@ class SqliteDatabase {
 	*/
 	findOne(table, params = {}) {
 		const query = this.buildSelectQuery(table, params);
-		winston.info('FINDONE:', query);
-		return this.db.prepare(query).get();
+		const prepared = this.db.prepare(query);
+		winston.info('FINDONE:', prepared);
+		const values = this.quoteAll(Object.values(this.flattenObj(params)), false);
+		return this.dequoteAll(prepared.get(...values));
 	}
 
 	/**
@@ -226,13 +278,18 @@ class SqliteDatabase {
 	* @param {?Object} whereParams A dictionary of column names to values to find items.
 	* @return {Promise} A promise that resolves into an error if there exists an error.
 	*/
-	update(table, valueParams, whereParams = {}) {
+	update(table, valueParams, whereParams) {
 		const query = this.buildUpdateQuery(table, valueParams, whereParams);
-		winston.info('UPDATE:', query);
+		const prepared = this.db.prepare(query);
+		winston.info('UPDATE:', prepared);
+		const params = Object.assign(
+			this.flattenObj(valueParams),
+			this.flattenObj(whereParams));
+		const values = this.quoteAll(Object.values(this.flattenObj(params)), false);
 
 		this.db.prepare('BEGIN TRANSACTION;').run();
-		const info = this.db.prepare(query).run();
-		this.db.run('COMMIT TRANSACTION;');
+		const info = prepared.run(...values);
+		this.db.prepare('COMMIT TRANSACTION;').run();
 
 		winston.info(info);
 		return info;
