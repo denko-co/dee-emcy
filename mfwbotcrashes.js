@@ -1,80 +1,42 @@
-var L = require('lokijs'); // There are starving kids in Africa who could use those characters!
-var tr = require('./translations.json'); // This is probably poor encapsulation, huh?
-var initalised = false;
-var db;
-var winston = require('winston');
+const tr = require('./translations.json'); // This is probably poor encapsulation, huh?
+const schema = require('./schema.json');
+const database = require('./db.js');
+const db_converter = require('./db_converter.js');
+const winston = require('winston');
 
-var init = function (callback) {
-  if (initalised) return;
-  initalised = true;
-  db = new L('./dmcdata.json');
+const channelInfoTableName = 'channelInfo';
 
-  db.loadDatabase({}, function (err) {
-    if (err) {
-      callback(err);
-    } else {
-      var collections = ['questions', 'shallow-questions', 'channelInfo', 'userInfo'];
-      for (var collection in collections) {
-        createCollection(db, collections[collection]);
-      }
-      db.saveDatabase(function (err) {
-        if (err) {
-          callback(err);
-        } else {
-          winston.info('Init worked, calling back.');
-          callback();
-        }
-      });
-    }
-  });
-};
+let initialised = false;
+let db;
 
-function createCollection (db, name) {
-  var collection = db.getCollection(name);
-  if (!collection) {
-    winston.info('Creating collection ' + name);
-    db.addCollection(name);
+const init = function (callback) {
+  if (initialised) {
+    return;
   }
-}
+  initialised = true;
+
+  // Initialize the database and create any tables which do not exist.
+  db = new database.SqliteDatabase('./dmcdata.db', schema);
+  callback();
+};
 
 exports.init = init;
 
-exports.performDataUpgrade = function (channelId, version) {
-  var thisChannelInfo = db.getCollection('channelInfo').findOne({'channel': channelId});
-  var logInfo = version + ' and channel ' + channelId;
-  var noUpgrade = false;
-  switch (version) {
-    case 'Version 1.7':
-      thisChannelInfo.onBreak = null;
-      thisChannelInfo.activity = {
-        'day-off': 0,
-        'weekend': 0,
-        'long-weekend': 0
-      };
-      break;
-    case 'Version 1.5':
-      thisChannelInfo.nextShallowQuestionToPostId = 1;
-      thisChannelInfo.nextShallowQuestionToSaveId = 1;
-      thisChannelInfo.isQuestionShallow = false;
-      break;
-    default:
-      winston.info('No upgrade required for ' + logInfo);
-      noUpgrade = true;
-  }
-  if (!noUpgrade) {
-    winston.info('Upgrade performed for ' + logInfo);
-    db.saveDatabase();
-  }
+exports.performDataUpgrade = function (oldDbName, newDbName) {
+  winston.info(`Starting migration from ${oldDbName} to ${newDbName}.`)
+  const converter = new db_converter.DatabaseConverter(oldDbName, newDbName);
+  converter.run();
+  winston.info(`Migrated database from ${oldDbName} to ${newDbName}.`);
 };
 
-exports.getChannelInfo = function (channelId, isCheck, callback) {
-  var channelInfo = db.getCollection('channelInfo');
-  var thisChannelInfo = channelInfo.findOne({'channel': channelId});
+exports.getChannelInfo =  function (channelId, isCheck, callback) {
+  const thisChannelInfo =  db.findOne(channelInfoTableName, {'channel': channelId});
+  // const thisChannelInfo = thisChannelInfo.map(v => unescape(v) if typeof(v) === 'string');
   if (!thisChannelInfo) {
     if (isCheck) {
       callback(null);
     } else {
-      var newChannel = channelInfo.insert({
+      const newChannel = db.insert(channelInfoTableName, {
         'channel': channelId,
         'reactCount': 3,
         'downvoteId': '%E2%AC%87',
@@ -92,15 +54,13 @@ exports.getChannelInfo = function (channelId, isCheck, callback) {
           'long-weekend': 0
         }
       });
-      addQuestion(channelId, tr.aSimpleQ1, '<3', false, function () {
-        db.saveDatabase(function (err) {
-          if (err) {
-            callback(err);
-          } else {
-            winston.info('Channel created successfully!');
-            callback(newChannel, true);
-          }
-        });
+      addQuestion(channelId, tr.aSimpleQ1, 0, false, (info) => {
+        if (info && info.changes && info.changes == 1) {
+          winston.info('Channel created successfully!');
+          callback(newChannel, true);
+        } else {
+          callback(info);
+        }
       });
     }
   } else {
@@ -108,41 +68,56 @@ exports.getChannelInfo = function (channelId, isCheck, callback) {
   }
 };
 
-var addQuestion = function (channelId, question, author, shallow, callback) {
-  var questions = shallow ? db.getCollection('shallow-questions') : db.getCollection('questions');
-  var thisChannelInfo = db.getCollection('channelInfo').findOne({'channel': channelId});
-  questions.insert({
+// TODO: Remove dependence on questionId (for both shallow and deep question tables).
+// Currently, this relies on no questions being saved at the same time, to return correctly.
+// Instead, this really should be using autoincrement.
+const manuallyIncrement =  function(channelId, field) {
+  const thisChannelInfo =  db.findOne(channelInfoTableName, {'channel': channelId});
+  const questionId = thisChannelInfo[field];
+  const newQuestionId = questionId + 1;
+
+  const valueParam = {};
+  valueParam[field] = newQuestionId;
+  db.update(channelInfoTableName, valueParam, {'channel': channelId});
+  return questionId;
+}
+
+const addQuestion =  function (channelId, question, author, shallow, callback) {
+  const questionTableName = shallow ? 'shallow-questions' : 'questions';
+  const field = shallow ? 'nextShallowQuestionToSaveId' : 'nextQuestionToSaveId';
+  const questionId =  manuallyIncrement(channelId, field);
+  let err = db.insert(questionTableName, {
     'channel': channelId,
     'question': question,
     'author': author,
-    'questionId': shallow ? thisChannelInfo.nextShallowQuestionToSaveId++ : thisChannelInfo.nextQuestionToSaveId++
+    'questionId': questionId
   });
-  db.saveDatabase(function (err) {
-    if (err) {
-      callback(err);
-    } else {
-      winston.info('Question saved successfully!');
-      callback();
-    }
-  });
+  if (err) {
+    console.log(err)
+    callback(err);
+  } else {
+    winston.info('Question saved successfully!');
+    callback();
+  }
 };
 
 exports.addQuestion = addQuestion;
 
-exports.getNextQuestion = function (channelId, check, callback, shouldFlip) {
+exports.getNextQuestion =  function (channelId, check, callback, shouldFlip) {
   winston.info('Getting question for ' + channelId + ', with check as ' + check + ' and shouldFlip as ' + shouldFlip);
-  var thisChannelInfo = db.getCollection('channelInfo').findOne({'channel': channelId});
-  var shallow = shouldFlip ? !thisChannelInfo.isQuestionShallow : thisChannelInfo.isQuestionShallow;
-  var questions = shallow ? db.getCollection('shallow-questions') : db.getCollection('questions');
-  var questionId = shallow ? thisChannelInfo.nextShallowQuestionToPostId : thisChannelInfo.nextQuestionToPostId;
-  var question = questions.findOne({'channel': channelId, 'questionId': questionId});
-  var hasNext = questions.findOne({'channel': channelId, 'questionId': questionId + 1});
+  const thisChannelInfo =  db.findOne('channelInfo', {'channel': channelId});
+  const shallow = shouldFlip ? !thisChannelInfo.isQuestionShallow : thisChannelInfo.isQuestionShallow;
+  const field = shallow ? 'nextShallowQuestionToPostId' : 'nextQuestionToPostId';
+  const questionId = thisChannelInfo[field];
+  const questionTableName = shallow ? 'shallow-questions' : 'questions';
+  const question = db.findOne(questionTableName, {'channel': channelId, 'questionId': questionId});
+  const hasNext = db.findOne(questionTableName, {'channel': channelId, 'questionId': questionId + 1});
   if (!check && shouldFlip) { // Shouldn't really check and flip
     flipShallow(channelId);
   }
   if (question) {
     if (!check) {
-      shallow ? thisChannelInfo.nextShallowQuestionToPostId++ : thisChannelInfo.nextQuestionToPostId++;
+       manuallyIncrement(channelId, field);
     }
     callback(question, shallow, hasNext);
   } else {
@@ -151,71 +126,71 @@ exports.getNextQuestion = function (channelId, check, callback, shouldFlip) {
 };
 
 exports.getQuestionMessageId = function (channelId) {
-  return db.getCollection('channelInfo').findOne({'channel': channelId}).questionOfTheDay;
+  return db.findOne(channelInfoTableName, {'channel': channelId}).questionOfTheDay;
 };
 
-exports.setQuestionMessageId = function (channelId, messageId, callback) {
-  var thisChannelInfo = db.getCollection('channelInfo').findOne({'channel': channelId});
-  thisChannelInfo.questionOfTheDay = messageId;
-  db.saveDatabase(function (err) {
-    if (err) {
-      callback(err);
-    } else {
-      console.log('Daily question saved!');
-      callback(messageId);
-    }
-  });
-};
-
-exports.getUserInfo = function (userId, callback) {
-  var users = db.getCollection('userInfo');
-  var user = users.findOne({'user': userId});
-  if (user) {
-    callback(user, true);
+exports.setQuestionMessageId =  function (channelId, messageId, callback) {
+  const err =  db.update(channelInfoTableName, {'questionOfTheDay': messageId}, {'channel': channelId}); 
+  if (err) {
+    callback(err);
   } else {
-    return callback(users.insert({
-      'user': userId,
-      'knowsSecret': false
-    }), false);
+    console.log('Daily question saved!');
+    callback(messageId);
   }
 };
 
-exports.getAllChannels = function () {
-  return db.getCollection('channelInfo').find().map(function (document) {
+exports.getUserInfo =  function (userId, callback) {
+  const userTableName = 'userInfo';
+  const user = db.findOne(userTableName, {'user': userId});
+  if (user) {
+    callback(user, true);
+  } else {
+    const err =  db.insert(userTableName, {
+      'user': userId,
+      'knowsSecret': false
+    });
+    return callback(err, false);
+  }
+};
+
+exports.getAllChannels =  function () {
+  const dataOrErr =  db.find(channelInfoTableName);
+  if (!dataOrErr) {
+    winston.error(dataOrErr);
+    return dataOrErr;
+  }
+  return dataOrErr.map((document) => {
     return document.channel;
   });
 };
 
 exports.hasDailyQuestion = function (channelId) {
-  return db.getCollection('channelInfo').findOne({'channel': channelId}).questionOfTheDay !== null;
+  return db.findOne(channelInfoTableName, {'channel': channelId}).questionOfTheDay !== null;
 };
 
 exports.getAsked = function (channelId) {
-  return db.getCollection('channelInfo').findOne({'channel': channelId}).asked;
+  return db.findOne(channelInfoTableName, {'channel': channelId}).asked;
 };
 
 exports.setAsked = function (channelId, value) {
-  db.getCollection('channelInfo').findOne({'channel': channelId}).asked = value;
-  db.saveDatabase();
+  db.update(channelInfoTableName, {'asked': value}, {'channel': channelId});
 };
 
 exports.getVersionText = function (channelId) {
-  return db.getCollection('channelInfo').findOne({'channel': channelId}).versionText;
+  return db.findOne(channelInfoTableName, {'channel': channelId}).versionText;
 };
 
 exports.setVersionText = function (channelId, value) {
-  db.getCollection('channelInfo').findOne({'channel': channelId}).versionText = value;
-  db.saveDatabase();
+  db.update(channelInfoTableName, {'versionText': value}, {'channel': channelId});
 };
 
 exports.getIsShallow = function (channelId) {
-  return db.getCollection('channelInfo').findOne({'channel': channelId}).isQuestionShallow;
+  return db.findOne(channelInfoTableName, {'channel': channelId}).isQuestionShallow;
 };
 
-var flipShallow = function (channelId) {
-  var thisChannelInfo = db.getCollection('channelInfo').findOne({'channel': channelId});
-  thisChannelInfo.isQuestionShallow = !thisChannelInfo.isQuestionShallow;
-  db.saveDatabase();
+const flipShallow =  function (channelId) {
+  const shallow =  db.findOne(channelInfoTableName, {'channel': channelId}).isQuestionShallow;
+  db.update(channelInfoTableName, {'isQuestionShallow': shallow}, {'channel': channelId});
 };
 
 exports.flipShallow = flipShallow;
@@ -223,19 +198,20 @@ exports.flipShallow = flipShallow;
 // Maybe we should clean this up as a generic getAttribute?
 
 exports.getOnBreak = function (channelId) {
-  return db.getCollection('channelInfo').findOne({'channel': channelId}).onBreak;
+  return db.findOne(channelInfoTableName, {'channel': channelId}).onBreak;
 };
 
 exports.setOnBreak = function (channelId, value) {
-  db.getCollection('channelInfo').findOne({'channel': channelId}).onBreak = value;
+  db.findOne(channelInfoTableName, {'channel': channelId}).onBreak = value;
   db.saveDatabase();
 };
 
 exports.getActivityInfo = function (channelId, activity) {
-  return db.getCollection('channelInfo').findOne({'channel': channelId}).activity[activity];
+  const activityName = 'activity_' + activity;
+  return db.findOne(channelInfoTableName, {'channel': channelId})[activityName];
 };
 
 exports.setActivityInfo = function (channelId, activity, value) {
-  db.getCollection('channelInfo').findOne({'channel': channelId}).activity[activity] = value;
-  db.saveDatabase();
+  const activityName = 'activity_' + activity;
+  db.update(channelInfoTableName, {activityName: value}, {'channel': channelId});
 };

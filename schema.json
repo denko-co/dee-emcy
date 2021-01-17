@@ -1,0 +1,52 @@
+[{
+  "tableName": "userInfo",
+  "columns": [
+    ["user", "TEXT" ],
+    ["knowsSecret", "BOOLEAN" ],
+    ["meta_revision", "INTEGER" ],
+    ["meta_created", "INTEGER" ],
+    ["meta_version", "INTEGER"]
+  ]}, {
+  "tableName": "channelInfo",
+  "columns": [
+    ["channel", "TEXT" ],
+    ["reactCount", "INTEGER" ],
+    ["downvoteId", "TEXT" ],
+    ["upvoteId", "TEXT" ],
+    ["questionOfTheDay", "TEXT" ],
+    ["nextQuestionToPostId", "INTEGER" ],
+    ["nextQuestionToSaveId", "INTEGER" ],
+    ["nextShallowQuestionToPostId", "INTEGER" ],
+    ["nextShallowQuestionToSaveId", "INTEGER" ],
+    ["isQuestionShallow", "BOOLEAN" ],
+    ["onBreak", "BOOLEAN" ],
+    ["activity_day-off", "INTEGER" ],
+    ["activity_weekend", "INTEGER" ],
+    ["activity_long-weekend", "INTEGER" ],
+    ["meta_revision", "INTEGER" ],
+    ["meta_created", "INTEGER" ],
+    ["meta_version", "INTEGER" ],
+    ["versionText", "TEXT" ],
+    ["asked", "BOOLEAN"]
+  ]}, {
+  "tableName": "shallow-questions",
+  "columns": [
+    ["channel", "TEXT" ],
+    ["question", "TEXT" ],
+    ["author", "TEXT" ],
+    ["questionId", "INTEGER" ],
+    ["meta_revision", "INTEGER" ],
+    ["meta_created", "INTEGER" ],
+    ["meta_version", "INTEGER"]
+  ]}, {
+  "tableName": "questions",
+  "columns": [
+    ["channel", "TEXT" ],
+    ["question", "TEXT" ],
+    ["author", "TEXT" ],
+    ["questionId", "INTEGER" ],
+    ["meta_revision", "INTEGER" ],
+    ["meta_created", "INTEGER" ],
+    ["meta_version", "INTEGER"]
+  ]}
+]

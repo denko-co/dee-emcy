@@ -1,19 +1,19 @@
-var fs = require('fs');
-var CronJob = require('cron').CronJob;
-var winston = require('winston');
-var moment = require('moment-timezone');
-var express = require('express');
-var app = express();
-var tr = require('./translations.json');
-var activities = require('./activities.json');
-var pers = require('./mfwbotcrashes.js');
-var Discord = require('discord.js');
-var bot = new Discord.Client({autoReconnect: true});
+const fs = require('fs');
+const CronJob = require('cron').CronJob;
+const winston = require('winston');
+const moment = require('moment-timezone');
+const express = require('express');
+const app = express();
+const tr = require('./translations.json');
+const activities = require('./activities.json');
+const pers = require('./mfwbotcrashes.js');
+const Discord = require('discord.js');
+const bot = new Discord.Client({autoReconnect: true});
 
-var MAX_MESSAGE_LENGTH = 1800;
-var CRON_TIMING = '0 10,15 * * *';
-var TIMEZONE = 'Pacific/Auckland';
-var HOLIDAY_API = [ // xD
+const MAX_MESSAGE_LENGTH = 1800;
+const CRON_TIMING = '0 10,15 * * *';
+const TIMEZONE = 'Pacific/Auckland';
+const HOLIDAY_API = [ // xD
   '25-12-2020', '26-12-2020', '28-12-2020',
   '01-01-2021', '02-01-2021', '04-01-2021',
   '01-02-2021',
@@ -46,9 +46,9 @@ pers.init(function (err) {
     winston.error(err);
     process.exit(1);
   }
-  var channelsCron = pers.getAllChannels();
-  for (var channel in channelsCron) {
-    var oldJob = new CronJob({
+  const channelsCron = pers.getAllChannels();
+  for (let channel in channelsCron) {
+    const oldJob = new CronJob({
       cronTime: CRON_TIMING,
       onTick: function () {
         postNewMessage(bot.channels.get(channelsCron[channel]), true);
@@ -76,18 +76,18 @@ pers.init(function (err) {
   function handleCurrentVersion (newChannelId) {
     fs.readFile('README.md', 'utf8', function (err, data) {
       if (err) throw err;
-      var channels = pers.getAllChannels();
-      var releaseNoteRegx = /(__\*\*(.*)\*\*__[^_]*)__\*\*/g;
-      var releaseNoteResult = releaseNoteRegx.exec(data);
-      var releaseNote = releaseNoteResult[1];
-      var version = releaseNoteResult[2];
+      const channels = pers.getAllChannels();
+      const releaseNoteRegx = /(__\*\*(.*)\*\*__[^_]*)__\*\*/g;
+      const releaseNoteResult = releaseNoteRegx.exec(data);
+      const releaseNote = releaseNoteResult[1];
+      const version = releaseNoteResult[2];
       if (newChannelId) {
         pers.setVersionText(newChannelId, releaseNote);
       } else {
         // Backup the db
         fs.createReadStream('./dmcdata.json').pipe(fs.createWriteStream('./' + 'backup_' + version.replace(/ /g, '_') + '.json'));
         // "Upgrade" all channels
-        for (var channel in channels) {
+        for (let channel in channels) {
           if (pers.getVersionText(channels[channel]) !== releaseNote) {
             pers.setVersionText(channels[channel], releaseNote);
             pers.performDataUpgrade(channels[channel], version);
@@ -101,12 +101,13 @@ pers.init(function (err) {
   }
 
   function handleReaction (messageReaction) {
-    var message = messageReaction.message;
-    var channelId = message.channel.id;
+    const message = messageReaction.message;
+    const channelId = message.channel.id;
     pers.getChannelInfo(channelId, true, function (channelInfo) {
+      // channelInfo = channelInfo.map(v => unescape(v) if typeof(v) === 'string');
       if (channelInfo !== null) {
         if (message.author.id === bot.user.id && pers.getQuestionMessageId(channelId) === message.id) {
-          var diff = message.reactions.reduce(function (val, curr) {
+          let diff = message.reactions.reduce(function (val, curr) {
             if (curr.emoji.identifier === channelInfo.upvoteId) {
               val -= curr.count;
             } else if (curr.emoji.identifier === channelInfo.downvoteId) {
@@ -125,23 +126,23 @@ pers.init(function (err) {
   }
 
   function handleDirectMessage (message) {
-    var msgContent = message.content;
+    let msgContent = message.content;
 
     if (msgContent.length > MAX_MESSAGE_LENGTH) {
       // Don't even read it, shoot back with a response and skip
-      var shortenBy = msgContent.length - MAX_MESSAGE_LENGTH;
-      var chars = ' character' + (shortenBy === 1 ? '' : 's');
+      const shortenBy = msgContent.length - MAX_MESSAGE_LENGTH;
+      const chars = ' character' + (shortenBy === 1 ? '' : 's');
       message.channel.send(tr.tooLong + (msgContent.length - MAX_MESSAGE_LENGTH) + chars + tr.tooLong2);
       return;
     }
 
-    var paramCommands = {
+    const paramCommands = {
       answer: ['a', 'ans', 'answer', 'anon'],
       dmc: ['d', 'dmc'],
       spd: ['s', 'spd']
     };
 
-    var paramCommandsDetails = {
+    const paramCommandsDetails = {
       answer: {
         description: 'If you\'re feeling a bit shy, if you send it to me, I can post it on your behalf.',
         usage: 'answer "Hey! I think you\'re really cool!"'
@@ -156,11 +157,11 @@ pers.init(function (err) {
       }
     };
 
-    var nonParamCommands = {
+    const nonParamCommands = {
       help: ['h', 'help']
     };
 
-    var nonParamCommandsDetails = {
+    const nonParamCommandsDetails = {
       help: {
         description: 'If you ever feel a bit stuck, or forget something (don\'t worry, happens to me too... more than I\'d like... >.>\'), send this to get this message again.',
         usage: '--help'
@@ -168,21 +169,21 @@ pers.init(function (err) {
     };
 
     function generateHelpText () {
-      var helpText = '';
+      let helpText = '';
       helpText += tr.helpText1;
       helpText += '\n-----\n' + tr.helpText2;
 
-      for (var ncommandId in nonParamCommands) {
-        var ncommand = nonParamCommands[ncommandId];
-        var ncommandDetails = nonParamCommandsDetails[ncommandId];
+      for (let ncommandId in nonParamCommands) {
+        const ncommand = nonParamCommands[ncommandId];
+        const ncommandDetails = nonParamCommandsDetails[ncommandId];
         helpText += '\n**' + ncommand.join(', ') + '** - ' + ncommandDetails.description + ' *For example:* `' + ncommandDetails.usage + '`\n';
       }
 
       helpText += '\n-----\n' + tr.helpText3;
 
-      for (var commandId in paramCommands) {
-        var command = paramCommands[commandId];
-        var commandDetails = paramCommandsDetails[commandId];
+      for (let commandId in paramCommands) {
+        const command = paramCommands[commandId];
+        const commandDetails = paramCommandsDetails[commandId];
         helpText += '\n**' + command.join(', ') + '** - ' + commandDetails.description + ' *For example:* `' + commandDetails.usage + '`\n';
       }
 
@@ -191,7 +192,7 @@ pers.init(function (err) {
       return helpText;
     }
 
-    for (var i = 0; i < msgContent.length; i++) {
+    for (let i = 0; i < msgContent.length; i++) {
       if (msgContent.charAt(i) !== '-') {
         msgContent = msgContent.substring(i);
         break;
@@ -204,9 +205,9 @@ pers.init(function (err) {
 
     // First, split it on the first whitespace, to see what bucket we need to check
 
-    var paramReg = /^(\S*)\s*([\s\S]*)$/; // NON GLOBAL REGEX WEOW
-    var params = paramReg.exec(msgContent);
-    var validOld = false;
+    const paramReg = /^(\S*)\s*([\s\S]*)$/; // NON GLOBAL REGEX WEOW
+    const params = paramReg.exec(msgContent);
+    let validOld = false;
 
     if (params === null) {
       // Something has gone terribly wrong. Return a message to the user, and log the error.
@@ -215,13 +216,13 @@ pers.init(function (err) {
       return;
     }
 
-    var modifierParam = params[1].toLowerCase();
-    var mainParam = params[2];
+    const modifierParam = params[1].toLowerCase();
+    const mainParam = params[2];
 
     // Ready to rumble! Grab the current user, start parsing input.
 
     pers.getUserInfo(message.author.id, function (userInfo, wasThere) {
-      var channels = pers.getAllChannels();
+      const channels = pers.getAllChannels();
 
       // Check if second param is empty, if so, run non-param checkLoops
       if (mainParam === '') {
@@ -237,7 +238,7 @@ pers.init(function (err) {
           // Send through to all listening channels as anon. Should take a channel param in future,
           // once we decide how that will work generally for all denko-co apps.
 
-          for (var toSendAnon in channels) {
+          for (let toSendAnon in channels) {
             bot.channels.get(channels[toSendAnon]).send(tr.aS + mainParam.slice(1, -1));
           }
 
@@ -247,8 +248,8 @@ pers.init(function (err) {
         } else if (paramCommands.dmc.includes(modifierParam) || paramCommands.spd.includes(modifierParam)) {
           // Handle DMC/SPD
 
-          var shallow = modifierParam[0] === 's';
-          for (var channel in channels) {
+          const shallow = modifierParam[0] === 's';
+          for (let channel in channels) {
             pers.addQuestion(channels[channel], mainParam.slice(1, -1), message.author.id, shallow, function () {});
           }
 
@@ -256,7 +257,7 @@ pers.init(function (err) {
           message.channel.send(tr.questRec + (shallow ? 'SPD' : 'DMC') + tr.questRec2);
 
           // Handle cases where it's going to cause a prompt
-          for (var toCheck in channels) {
+          for (let toCheck in channels) {
             if (!pers.hasDailyQuestion(channels[toCheck]) && pers.getIsShallow(channels[toCheck]) === shallow && pers.getOnBreak(channels[toCheck]) === null) {
               bot.channels.get(channels[channel]).send(tr.aNewQ).then(function (message) {
                 pers.getChannelInfo(channels[channel], true, function (channelInfo) {
@@ -324,10 +325,10 @@ pers.init(function (err) {
   });
 
   function daysTillWork () {
-    var today = moment().tz(TIMEZONE);
-    var formattedToday = today.format('DD-MM-YYYY');
-    var dayToday = today.format('dddd');
-    var daysTillWork = 0;
+    const today = moment().tz(TIMEZONE);
+    let formattedToday = today.format('DD-MM-YYYY');
+    let dayToday = today.format('dddd');
+    let daysTillWork = 0;
     while (true) { // monkaGun
       if (isTodayHoliday(formattedToday) || dayToday === 'Saturday' || dayToday === 'Sunday') {
         daysTillWork++;
@@ -364,7 +365,7 @@ pers.init(function (err) {
         winston.info('CronJob created for new channel ' + channel.id);
       }
       if (channelInfo.questionOfTheDay !== null) {
-        channel.fetchMessage(channelInfo.questionOfTheDay).then(function (message) {
+        channel.fetchMessage(channelInfo.questionOfTheDay).then((message) => {
           if (message.pinned) {
             message.unpin();
           }
@@ -374,19 +375,19 @@ pers.init(function (err) {
       // Handle holiday mode if a question hasn't been forced (indicated by a shouldFlip)
       if (shouldFlip) {
         // Check if they are currently on on break
-        var onBreak = pers.getOnBreak(channel.id);
+        const onBreak = pers.getOnBreak(channel.id);
         if (onBreak === null) {
           // Dee not on break, check if she should be
-          var days = daysTillWork();
+          const days = daysTillWork();
           if (days !== 0) {
-            var type = 'weekend';
+            let type = 'weekend';
             if (days === 1) {
               type = 'day-off';
             } else if (days > 2) {
               type = 'long-weekend';
             }
-            var activityNum = pers.getActivityInfo(channel.id, type);
-            var activity = activities[type][activityNum];
+            const activityNum = pers.getActivityInfo(channel.id, type);
+            let activity = activities[type][activityNum];
             if (activity === undefined) {
               activity = tr.defaultActivity;
             } else {
@@ -399,10 +400,10 @@ pers.init(function (err) {
           } // else nothing to do
         } else {
           // Dee on break, check if she shouldn't be
-          var daysLeft = daysTillWork();
+          const daysLeft = daysTillWork();
           if (daysLeft === 0) {
-            var activityCompletedNum = pers.getActivityInfo(channel.id, onBreak);
-            var activityCompleted = activities[onBreak][activityCompletedNum];
+            const activityCompletedNum = pers.getActivityInfo(channel.id, onBreak);
+            let activityCompleted = activities[onBreak][activityCompletedNum];
             if (activityCompleted === undefined) {
               activityCompleted = tr.defaultOutcome;
             } else {
@@ -424,7 +425,7 @@ pers.init(function (err) {
             pers.setQuestionMessageId(message.channel.id, null, function () {});
           });
         } else {
-          var needQ = (hasNext === null) ? tr.noQTommorrow : '';
+          const needQ = (hasNext === null) ? tr.noQTommorrow : '';
           channel.send('***Today\'s ' + (shallow ? 'shallow and pointless' : 'deep and meaningful') + ' question is: ***' + question.question + needQ).then(function (message) {
             message.react(channelInfo.upvoteId).then(function (reactionAdded) {
               message.react(channelInfo.downvoteId);
