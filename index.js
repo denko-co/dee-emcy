@@ -10,6 +10,13 @@ var pers = require('./mfwbotcrashes.js');
 var Discord = require('discord.js');
 var bot = new Discord.Client({autoReconnect: true});
 
+const LOG_TITLE = `    ____               ______
+   / __ \\___  ___     / ____/___ ___  _______  __
+  / / / / _ \\/ _ \\   / __/ / __ \`__ \\/ ___/ / / /
+ / /_/ /  __/  __/  / /___/ / / / / / /__/ /_/ /
+/_____/\\___/\\___/  /_____/_/ /_/ /_/\\___/\\__, /
+                                        /____/`;
+
 var MAX_MESSAGE_LENGTH = 1800;
 var CRON_TIMING = '0 10,15 * * *';
 var TIMEZONE = 'Pacific/Auckland';
@@ -17,6 +24,8 @@ var HOLIDAY_API = [ // xD
   '25-12-2020', '26-12-2020', '28-12-2020',
   '01-01-2021', '02-01-2021', '04-01-2021',
   '01-02-2021',
+  // Bonus holiday
+  '04-02-2021', '05-02-2021',
   '06-02-2021', '08-02-2021',
   '02-04-2021', '05-04-2021',
   '25-04-2021', '26-04-2021',
@@ -37,6 +46,8 @@ winston.configure({
   ]
 });
 
+winston.info(LOG_TITLE);
+
 bot.login(process.env.TOKEN).catch(function (msg) {
   winston.error(msg);
 });
@@ -46,6 +57,7 @@ pers.init(function (err) {
     winston.error(err);
     process.exit(1);
   }
+  winston.info('DB loaded');
   var channelsCron = pers.getAllChannels();
   for (var channel in channelsCron) {
     var oldJob = new CronJob({
@@ -81,6 +93,7 @@ pers.init(function (err) {
       var releaseNoteResult = releaseNoteRegx.exec(data);
       var releaseNote = releaseNoteResult[1];
       var version = releaseNoteResult[2];
+      winston.info(`Running Dee Emcy version ${version}`);
       if (newChannelId) {
         pers.setVersionText(newChannelId, releaseNote);
       } else {
@@ -89,6 +102,7 @@ pers.init(function (err) {
         // "Upgrade" all channels
         for (var channel in channels) {
           if (pers.getVersionText(channels[channel]) !== releaseNote) {
+            winston.info('New version: Sending out the release notes');
             pers.setVersionText(channels[channel], releaseNote);
             pers.performDataUpgrade(channels[channel], version);
             bot.channels.get(channels[channel]).send(tr.whatHappened + releaseNote);
@@ -349,6 +363,7 @@ pers.init(function (err) {
   }
 
   function postNewMessage (channel, shouldFlip) {
+    winston.info('About to post a new message');
     pers.getChannelInfo(channel.id, false, function (channelInfo, isNewChannel) {
       if (isNewChannel) {
         handleCurrentVersion(channel.id);
@@ -385,6 +400,7 @@ pers.init(function (err) {
             } else if (days > 2) {
               type = 'long-weekend';
             }
+            winston.info(`Starting ${type} break for ${days} days`);
             var activityNum = pers.getActivityInfo(channel.id, type);
             var activity = activities[type][activityNum];
             if (activity === undefined) {
@@ -413,6 +429,7 @@ pers.init(function (err) {
             pers.setOnBreak(channel.id, null);
             // Continue with q asking
           } else {
+            winston.info(`On break: ${daysLeft} days left`);
             return;
           }
         }
