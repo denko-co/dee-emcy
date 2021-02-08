@@ -98,7 +98,7 @@ pers.init(function (err) {
         pers.setVersionText(newChannelId, releaseNote);
       } else {
         // Backup the db
-        fs.createReadStream('./dmcdata.json').pipe(fs.createWriteStream('./' + 'backup_' + version.replace(/ /g, '_') + '.json'));
+        fs.createReadStream('./data/dmcdata.json').pipe(fs.createWriteStream('./' + 'backup_' + version.replace(/ /g, '_') + '.json'));
         // "Upgrade" all channels
         for (var channel in channels) {
           if (pers.getVersionText(channels[channel]) !== releaseNote) {
