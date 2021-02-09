@@ -7,7 +7,7 @@ var winston = require('winston');
 var init = function (callback) {
   if (initalised) return;
   initalised = true;
-  db = new L('./dmcdata.json');
+  db = new L('./data/dmcdata.json');
 
   db.loadDatabase({}, function (err) {
     if (err) {

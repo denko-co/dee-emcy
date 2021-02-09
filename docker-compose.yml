@@ -6,7 +6,7 @@ services:
     restart: always
     env_file: .env
     volumes:
-      - "db-data:/app"
+      - "db-data:/app/data"
 
 volumes:
   db-data:
