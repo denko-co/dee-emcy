@@ -13,7 +13,7 @@
         <maven.compiler.target>17</maven.compiler.target>
         <kotlin.version>1.5.31</kotlin.version>
         <kotlin.compiler.incremental>true</kotlin.compiler.incremental>
-        <main.class>com.sarencurrie.deemake.MainKt</main.class>
+        <main.class>com.sarencurrie.deemake.MfwBotCrashesKt</main.class>
     </properties>
 
     <dependencies>
